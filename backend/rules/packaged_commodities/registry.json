@@ -1,0 +1,85 @@
+{
+  "registry_version": "PCR-2011-CURRENT",
+  "framework": "Legal Metrology (Packaged Commodities) Rules, 2011",
+  "authority": "Department of Consumer Affairs, Ministry of Consumer Affairs, Food and Public Distribution, Government of India",
+  "primary_act": "Legal Metrology Act, 2009 (Act No. 1 of 2010)",
+  "official_sources": [
+    {
+      "source_id": "GSR-202E-2011",
+      "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+      "notification": "G.S.R. 202(E)",
+      "date": "2011-03-07",
+      "effective_from": "2011-04-01",
+      "source_type": "official_gazette",
+      "source_url": "https://consumeraffairs.nic.in/acts-and-rules/legal-metrology/legal-metrology-packaged-commodities-rules-2011"
+    },
+    {
+      "source_id": "GSR-779E-2017",
+      "instrument": "Legal Metrology (Packaged Commodities) Amendment Rules, 2017",
+      "notification": "G.S.R. 779(E)",
+      "date": "2017-06-23",
+      "effective_from": "2018-01-01",
+      "source_type": "official_gazette",
+      "source_url": "https://consumeraffairs.nic.in"
+    },
+    {
+      "source_id": "GSR-784E-2021",
+      "instrument": "Legal Metrology (Packaged Commodities) (Second Amendment) Rules, 2021",
+      "notification": "G.S.R. 784(E)",
+      "date": "2021-11-02",
+      "effective_from": "2022-12-01",
+      "source_type": "official_gazette",
+      "source_url": "https://consumeraffairs.nic.in"
+    },
+    {
+      "source_id": "GSR-226E-2022",
+      "instrument": "Legal Metrology (Packaged Commodities) Amendment Rules, 2022",
+      "notification": "G.S.R. 226(E)",
+      "date": "2022-03-28",
+      "effective_from": "2022-10-01",
+      "source_type": "official_gazette",
+      "source_url": "https://consumeraffairs.nic.in"
+    },
+    {
+      "source_id": "GSR-512E-2023",
+      "instrument": "Legal Metrology (Packaged Commodities) (Second Amendment) Rules, 2023",
+      "notification": "G.S.R. 512(E)",
+      "date": "2023-07-14",
+      "effective_from": "2023-07-14",
+      "source_type": "official_gazette",
+      "source_url": "https://consumeraffairs.nic.in"
+    },
+    {
+      "source_id": "GSR-2025-MED",
+      "instrument": "Legal Metrology (Packaged Commodities) Amendment Rules, 2025 (Medical Devices Provisions)",
+      "notification": "G.S.R. Notification 2025",
+      "date": "2025-01-15",
+      "effective_from": "2025-01-15",
+      "source_type": "official_gazette",
+      "source_url": "https://consumeraffairs.nic.in"
+    }
+  ],
+  "rules": [
+    "rules/rule_4.json",
+    "rules/rule_6_1_a.json",
+    "rules/rule_6_1_aa.json",
+    "rules/rule_6_1_b.json",
+    "rules/rule_6_1_c.json",
+    "rules/rule_6_1_d.json",
+    "rules/rule_6_1_e.json",
+    "rules/rule_6_1_f.json",
+    "rules/rule_6_1_m.json",
+    "rules/rule_6_1_expiry.json",
+    "rules/rule_7_8.json",
+    "rules/rule_9.json",
+    "rules/rule_10.json",
+    "rules/rule_12_13.json",
+    "rules/rule_18.json",
+    "rules/rule_24.json",
+    "rules/rule_25.json",
+    "rules/rule_26.json",
+    "rules/rule_electronics_qr.json",
+    "rules/rule_medical_devices.json",
+    "rules/draft_amendment_2025.json"
+  ]
+}

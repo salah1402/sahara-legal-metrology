@@ -1,0 +1,34 @@
+{
+  "rule_id": "PCR-2011-R6-1-m",
+  "rule_number": "6(1)(m)",
+  "title": "Unit Sale Price (USP) Declaration",
+  "description": "Declaration of Unit Sale Price in Rupees per g / kg / ml / l / cm / m or per number/unit, according to the threshold: mass < 1 kg in per g, >= 1 kg in per kg; volume < 1 L in per ml, >= 1 L in per l; length < 1 m in per cm, >= 1 m in per m; items sold by number in per piece/number, rounded to up to two decimal places.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) (Second Amendment) Rules, 2021 read with 2022 Amendment",
+    "notification": "G.S.R. 784(E) read with G.S.R. 226(E)",
+    "effective_from": "2022-12-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["retail", "group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false,
+    "exempt_single_unit_equal_to_standard": false
+  },
+  "requirements": {
+    "declaration_type": "unit_sale_price",
+    "thresholds": {
+      "mass_threshold_grams": 1000,
+      "volume_threshold_ml": 1000,
+      "length_threshold_cm": 100
+    },
+    "precision_decimals": 2
+  },
+  "evaluator": {
+    "handler": "evaluate_unit_sale_price"
+  },
+  "evidence_requirements": {
+    "fields": ["mrp", "net_quantity"]
+  }
+}

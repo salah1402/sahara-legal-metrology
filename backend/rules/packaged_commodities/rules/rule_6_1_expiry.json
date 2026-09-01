@@ -1,0 +1,28 @@
+{
+  "rule_id": "PCR-2011-R6-1-expiry",
+  "rule_number": "6(1) Proviso",
+  "title": "Best Before or Use By Date (Perishable Commodities)",
+  "description": "For packages containing commodities which may become unfit for human consumption after a period of time, the 'best before' or 'use by' date, month, and year shall be indicated.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) read with FSSAI Regulations",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "commodity_type": ["food", "beverage", "dairy", "edible_oil", "perishable"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "declaration_type": "best_before_or_expiry",
+    "conditional_on_perishable": true
+  },
+  "evaluator": {
+    "handler": "evaluate_best_before_or_expiry"
+  },
+  "evidence_requirements": {
+    "fields": ["best_before", "expiry_date"]
+  }
+}

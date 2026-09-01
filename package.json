@@ -1,0 +1,12 @@
+{
+  "name": "metracheck",
+  "version": "2.0.0",
+  "private": true,
+  "description": "MetraCheck — Legal Metrology Inspection System",
+  "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File ./start-dev.ps1",
+    "dev:backend": "powershell -ExecutionPolicy Bypass -File ./start-backend.ps1",
+    "dev:frontend": "powershell -ExecutionPolicy Bypass -File ./start-frontend.ps1",
+    "test": "powershell -Command \"& '.\\ocr test\\.venv\\Scripts\\python.exe' -m unittest backend.tests.test_nemotron_pipeline\""
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "rule_id": "PCR-2011-R9",
+  "rule_number": "9",
+  "title": "Manner of Declarations, Legibility & Prominence",
+  "description": "Declarations on a package shall be legible, prominent, and in distinct contrast with the background colour of the package. OCR reading a word does not automatically guarantee full visual compliance under all optical conditions.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E)",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["retail", "wholesale", "group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "legibility_required": true,
+    "prominence_required": true
+  },
+  "evaluator": {
+    "handler": "evaluate_manner_of_declaration"
+  },
+  "evidence_requirements": {
+    "fields": ["mrp", "net_quantity", "commodity_name"]
+  }
+}

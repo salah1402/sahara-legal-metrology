@@ -1,0 +1,29 @@
+{
+  "rule_id": "PCR-2011-R6-1-a",
+  "rule_number": "6(1)(a)",
+  "title": "Manufacturer / Packer / Importer Name & Address",
+  "description": "Every package shall bear the name and complete postal address of the manufacturer, or where the manufacturer is not the packer, the name and address of the manufacturer and packer, or for imported goods, the name and address of the importer.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) read with G.S.R. 779(E)",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in/acts-and-rules/legal-metrology/legal-metrology-packaged-commodities-rules-2011"
+  },
+  "applicability": {
+    "package_category": ["retail", "wholesale", "group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "declaration_type": "name_and_address",
+    "must_declare_any_of": ["manufacturer", "packer", "importer"],
+    "address_required": true
+  },
+  "evaluator": {
+    "handler": "evaluate_manufacturer_packer_importer"
+  },
+  "evidence_requirements": {
+    "fields": ["manufacturer", "packer", "importer", "manufacturer_address", "packer_address", "importer_address"]
+  }
+}

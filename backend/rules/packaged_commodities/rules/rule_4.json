@@ -1,0 +1,29 @@
+{
+  "rule_id": "PCR-2011-R4",
+  "rule_number": "4",
+  "title": "Group, Combination & Multi-Piece Packages",
+  "description": "Where retail packages are grouped together for promotional offer or combo sale, the outer group package and the individual components must satisfy the declarations required under current Rule 4 and Rule 6.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) amended by G.S.R. 784(E)",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "declaration_type": "group_package_declarations",
+    "individual_item_count_required": true,
+    "combined_net_quantity_required": true
+  },
+  "evaluator": {
+    "handler": "evaluate_group_combination_packages"
+  },
+  "evidence_requirements": {
+    "fields": ["number_of_items", "net_quantity", "mrp"]
+  }
+}

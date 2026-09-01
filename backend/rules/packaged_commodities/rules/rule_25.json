@@ -1,0 +1,26 @@
+{
+  "rule_id": "PCR-2011-R25",
+  "rule_number": "25",
+  "title": "Export Packages Requirements & Domestic Sale Restriction",
+  "description": "Packages marked for export or intended for export are exempt from ordinary domestic retail declarations under Chapter II, provided they are not sold or offered for sale in the domestic Indian market.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) read with Rule 25",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "is_export_package": true
+  },
+  "requirements": {
+    "declaration_type": "export_declaration"
+  },
+  "evaluator": {
+    "handler": "evaluate_export_package"
+  },
+  "evidence_requirements": {
+    "fields": ["commodity_name"]
+  }
+}

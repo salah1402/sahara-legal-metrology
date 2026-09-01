@@ -1,0 +1,27 @@
+{
+  "rule_id": "PCR-2011-R10",
+  "rule_number": "10",
+  "title": "Declaration of Complete Address",
+  "description": "The name and complete postal address of the manufacturer, packer, or importer shall be declared with sufficient detail to enable a consumer or legal authority to locate the physical premises.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) read with Rule 10",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["retail", "wholesale", "group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "complete_address_required": true
+  },
+  "evaluator": {
+    "handler": "evaluate_complete_address"
+  },
+  "evidence_requirements": {
+    "fields": ["manufacturer_address", "packer_address", "importer_address"]
+  }
+}

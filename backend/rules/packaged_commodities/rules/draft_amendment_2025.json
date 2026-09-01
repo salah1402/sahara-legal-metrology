@@ -1,0 +1,26 @@
+{
+  "rule_id": "PCR-2025-DRAFT-AMEND-2",
+  "rule_number": "Draft Rule 2025 (Second Amendment Draft)",
+  "title": "Draft Legal Metrology (Packaged Commodities) Second Amendment, 2025 (FOR REFERENCE ONLY)",
+  "description": "Proposed draft amendment regarding mandatory QR codes across non-electronic FMCG packaging. Being draft legislation, it MUST NOT be applied as an active compliance requirement.",
+  "status": "draft",
+  "source": {
+    "instrument": "Draft Legal Metrology (Packaged Commodities) (Second Amendment) Rules, 2025",
+    "notification": "Draft Consultation Paper",
+    "effective_from": "2099-01-01",
+    "source_type": "draft_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["draft_reference_only"]
+  },
+  "requirements": {
+    "draft_only": true
+  },
+  "evaluator": {
+    "handler": "evaluate_draft_rule_ignored"
+  },
+  "evidence_requirements": {
+    "fields": []
+  }
+}

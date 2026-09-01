@@ -1,0 +1,28 @@
+{
+  "rule_id": "PCR-2011-R12-13",
+  "rule_number": "12 & 13",
+  "title": "Standard Units of Weight, Measure or Count",
+  "description": "The declaration of quantity shall be expressed in terms of the standard metric units of weight (g, kg), volume (mL, L), length (cm, m), area, or count (units/N). Non-standard units (such as lbs, oz, fluid oz) are prohibited.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) read with Rule 12 & 13",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["retail", "wholesale", "group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "standard_units_only": true,
+    "valid_units": ["g", "kg", "mg", "mL", "L", "cm", "m", "mm", "units", "pieces", "N"]
+  },
+  "evaluator": {
+    "handler": "evaluate_standard_units"
+  },
+  "evidence_requirements": {
+    "fields": ["net_quantity"]
+  }
+}

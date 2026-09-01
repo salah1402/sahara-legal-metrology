@@ -1,0 +1,26 @@
+{
+  "rule_id": "PCR-2011-R26",
+  "rule_number": "26",
+  "title": "Statutory Exemptions under Rule 26",
+  "description": "Exemptions from Chapter II declarations for: (a) packages containing net weight/volume of 10 g or 10 mL or less; (b) commodities packed for institutional consumers or industrial consumers; (c) garments/hosiery sold in loose or open form; (d) loose commodities ordered through e-commerce where consumer receives unsealed delivery.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) amended by G.S.R. 779(E) & 2023 Advisory",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["retail", "small_package", "institutional", "loose_garments", "loose_ecommerce"]
+  },
+  "requirements": {
+    "exemption_types": ["small_quantity_under_10g", "institutional_consumer", "garments_sold_loose", "ecommerce_loose_commodity"]
+  },
+  "evaluator": {
+    "handler": "evaluate_rule_26_exemptions"
+  },
+  "evidence_requirements": {
+    "fields": ["net_quantity"]
+  }
+}

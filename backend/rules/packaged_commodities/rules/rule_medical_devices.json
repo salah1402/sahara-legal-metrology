@@ -1,0 +1,26 @@
+{
+  "rule_id": "PCR-2025-MED-DEV",
+  "rule_number": "Medical Devices Exclusion (2025 Amendment)",
+  "title": "Medical Devices Special Statutory Treatment (2025 Amendment)",
+  "description": "For packages containing medical devices, the applicable Medical Devices Rules, 2017 shall apply instead of conflicting general LMPC declaration/typography requirements.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Amendment Rules, 2025 read with Medical Devices Rules, 2017",
+    "notification": "G.S.R. Notification 2025 (Medical Devices Provisions)",
+    "effective_from": "2025-01-15",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "is_medical_device": true
+  },
+  "requirements": {
+    "medical_devices_rules_2017_override": true
+  },
+  "evaluator": {
+    "handler": "evaluate_medical_device_exclusion"
+  },
+  "evidence_requirements": {
+    "fields": ["commodity_name"]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "rule_id": "PCR-2011-R7-8",
+  "rule_number": "7 & 8",
+  "title": "Principal Display Panel Area & Minimum Character Height",
+  "description": "Every mandatory declaration shall appear on the principal display panel with character height in accordance with Rule 7 Table. In absence of physical scale/calibration, evaluation must report NEEDS_REVIEW rather than fabricating millimetre measurements from image pixels.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) read with Rule 7 & 8",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["retail", "group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "requires_physical_scale_calibration": true
+  },
+  "evaluator": {
+    "handler": "evaluate_font_size_and_pdp"
+  },
+  "evidence_requirements": {
+    "fields": ["net_quantity"]
+  }
+}

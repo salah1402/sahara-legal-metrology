@@ -1,0 +1,43 @@
+# ====================================================================
+# SAHARA — Git Ignore Configuration
+# ====================================================================
+
+# Environment Variables & Secrets (CRITICAL)
+**/.env
+**/.env.local
+**/.env.*.local
+*.env
+backend/.env
+frontend/.env
+!**/.env.example
+
+# Python virtual environments & bytecode
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.venv/
+**/venv/
+**/env/
+**/*.egg-info/
+dist/
+build/
+*.spec
+
+# Node / Frontend dependencies & build output
+**/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Inspection uploads & runtime data (keep folder via .gitkeep)
+backend/inspections/*
+!backend/inspections/.gitkeep
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+*.tmp
+*.log

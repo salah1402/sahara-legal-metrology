@@ -1,0 +1,28 @@
+{
+  "rule_id": "PCR-2011-R6-1-f",
+  "rule_number": "6(1)(f)",
+  "title": "Consumer Care Helpline & Grievance Details",
+  "description": "The name, address, telephone number, and e-mail address of the person who can be or the office which can be contacted in case of consumer complaints shall be mentioned on every retail package.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) Rules, 2011",
+    "notification": "G.S.R. 202(E) amended by G.S.R. 779(E)",
+    "effective_from": "2011-04-01",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "package_category": ["retail", "group", "combination", "multi_piece"],
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "declaration_type": "consumer_care",
+    "must_include_contact_channel": ["telephone", "email", "address"]
+  },
+  "evaluator": {
+    "handler": "evaluate_consumer_care"
+  },
+  "evidence_requirements": {
+    "fields": ["consumer_care", "consumer_care_phone", "consumer_care_email"]
+  }
+}

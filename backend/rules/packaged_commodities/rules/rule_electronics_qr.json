@@ -1,0 +1,28 @@
+{
+  "rule_id": "PCR-2011-R-ELEC-QR",
+  "rule_number": "6(1) Electronic QR Proviso",
+  "title": "Electronic Products QR Code Declaration Provisions (2023 Amendment)",
+  "description": "For electronic products, manufacturer may declare certain detailed statutory information (such as full address, user manual, detailed specifications) through a scannable QR Code on the principal display panel, provided basic declarations (MRP, commodity name, consumer care, country of origin) remain visible on the physical package.",
+  "status": "enacted",
+  "source": {
+    "instrument": "Legal Metrology (Packaged Commodities) (Second Amendment) Rules, 2023",
+    "notification": "G.S.R. 512(E)",
+    "effective_from": "2023-07-14",
+    "source_type": "official_gazette",
+    "source_url": "https://consumeraffairs.nic.in"
+  },
+  "applicability": {
+    "is_electronic_product": true,
+    "exempt_under_rule_26": false
+  },
+  "requirements": {
+    "qr_substitution_allowed_for_electronics": true,
+    "mandatory_on_package": ["mrp", "commodity_name", "consumer_care", "country_of_origin"]
+  },
+  "evaluator": {
+    "handler": "evaluate_electronic_qr_provisions"
+  },
+  "evidence_requirements": {
+    "fields": ["commodity_name", "mrp", "consumer_care"]
+  }
+}
