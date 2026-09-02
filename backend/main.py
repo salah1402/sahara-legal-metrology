@@ -13,8 +13,10 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 try:
+    # pyrefly: ignore [missing-import]
     from paddleocr import PaddleOCR
-except ImportError:
+except ImportError as e:
+    print(f"Failed to import PaddleOCR: {e}")
     PaddleOCR = None
 
 from backend.models.schemas import (
