@@ -11,7 +11,7 @@ export async function normalizeOCR(
   ocrTokens?: OCRTextRegion[]
 ): Promise<StructuredProductData> {
   const config = getApiConfig();
-  const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/normalize`;
+  const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/api/normalize`;
 
   try {
     const payload: { inspection_id: string; ocr?: OCRTextRegion[] } = {

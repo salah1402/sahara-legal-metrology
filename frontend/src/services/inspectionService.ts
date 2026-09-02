@@ -33,7 +33,7 @@ export async function listInspections(): Promise<InspectionMetadata[]> {
   const config = getApiConfig();
 
   try {
-    const response = await fetch(`${config.baseUrl}/inspections`);
+    const response = await fetch(`${config.baseUrl.replace(/\/+$/, '')}/api/inspections`);
     if (response.ok) {
       const remoteList = await response.json();
       if (Array.isArray(remoteList) && remoteList.length > 0) {
@@ -63,9 +63,10 @@ export async function listInspections(): Promise<InspectionMetadata[]> {
 export async function getInspection(id: string): Promise<InspectionRecord | null> {
   initStorage();
   const config = getApiConfig();
+  const base = config.baseUrl.replace(/\/+$/, '');
 
   try {
-    const response = await fetch(`${config.baseUrl}/inspections/${id}`);
+    const response = await fetch(`${base}/api/inspections/${id}`);
     if (response.ok) {
       const data = await response.json();
       const record: InspectionRecord = {
@@ -82,7 +83,7 @@ export async function getInspection(id: string): Promise<InspectionRecord | null
             name: data.ocr?.image || 'product.jpg',
             size: 0,
             type: 'image/jpeg',
-            previewUrl: `${config.baseUrl}/inspections/${id}/image/${data.ocr?.image || 'product.jpg'}`,
+            previewUrl: `${base}/api/inspections/${id}/image/${data.ocr?.image || 'product.jpg'}`,
             uploadedAt: data.metadata?.created_at || new Date().toISOString()
           }
         ],
@@ -137,7 +138,7 @@ export async function renameInspection(id: string, displayName: string): Promise
   };
 
   try {
-    const response = await fetch(`${config.baseUrl}/inspections/${id}`, {
+    const response = await fetch(`${config.baseUrl.replace(/\/+$/, '')}/api/inspections/${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

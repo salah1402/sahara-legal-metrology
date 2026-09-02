@@ -12,7 +12,8 @@ export interface InspectionSummaryResponse {
 
 export async function fetchInspectionSummary(inspectionId: string): Promise<InspectionSummaryResponse> {
   const config = getApiConfig();
-  const response = await fetch(`${config.baseUrl}/inspections/${inspectionId}/summary`);
+  const base = config.baseUrl.replace(/\/+$/, '');
+  const response = await fetch(`${base}/api/inspections/${inspectionId}/summary`);
   if (!response.ok) {
     throw new Error(`Failed to fetch inspection summary: ${response.statusText}`);
   }
@@ -23,7 +24,8 @@ export const getInspectionSummary = fetchInspectionSummary;
 
 export async function exportInspectionPDF(inspectionId: string): Promise<Blob> {
   const config = getApiConfig();
-  const response = await fetch(`${config.baseUrl}/inspections/${inspectionId}/report`, {
+  const base = config.baseUrl.replace(/\/+$/, '');
+  const response = await fetch(`${base}/api/inspections/${inspectionId}/report`, {
     method: 'POST',
   });
   if (!response.ok) {

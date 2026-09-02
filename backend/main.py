@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import json
 import re
@@ -12,11 +13,39 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("sahara_backend")
+
+# --------------------------------------------------------------------
+# PaddlePaddle, PaddleX & PaddleOCR Version & Import Detection
+# --------------------------------------------------------------------
+paddle_version = "not installed"
+paddlex_version = "not installed"
+paddleocr_version = "not installed"
+
 try:
-    # pyrefly: ignore [missing-import]
-    from paddleocr import PaddleOCR
-except ImportError as e:
-    print(f"Failed to import PaddleOCR: {e}")
+    import paddle  # type: ignore
+    paddle_version = getattr(paddle, "__version__", "unknown")
+except Exception as e:
+    paddle_version = f"not loaded ({e})"
+
+try:
+    import paddlex  # type: ignore
+    paddlex_version = getattr(paddlex, "__version__", "unknown")
+except Exception as e:
+    paddlex_version = f"not loaded ({e})"
+
+PaddleOCR = None
+paddleocr_import_error: Optional[str] = None
+
+try:
+    from paddleocr import PaddleOCR  # type: ignore
+    p_mod = sys.modules.get("paddleocr")
+    paddleocr_version = getattr(p_mod, "__version__", "3.x")
+    logger.info(f"PaddleOCR imported successfully (PaddlePaddle: {paddle_version}, PaddleOCR: {paddleocr_version}, PaddleX: {paddlex_version})")
+except Exception as e:
+    paddleocr_import_error = str(e)
+    logger.error(f"Failed to import PaddleOCR: {e}", exc_info=True)
     PaddleOCR = None
 
 from backend.models.schemas import (
@@ -28,9 +57,6 @@ from backend.services.nemotron_service import normalize_ocr_with_nemotron
 from backend.services.compliance_service import run_compliance_evaluation
 from backend.services.report_service import generate_inspection_pdf
 from backend.services.summary_service import generate_inspection_summary
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("sahara_backend")
 
 # Base directory paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -44,22 +70,16 @@ app = FastAPI(
     version="3.1.0"
 )
 
-# Configure CORS for Vite development server, production host, and configurable origins
+# Configure CORS for all origins, local development, and Vercel production hosts
 cors_origins_env = os.getenv("CORS_ORIGINS", "")
 allowed_origins = [orig.strip() for orig in cors_origins_env.split(",") if orig.strip()]
 if not allowed_origins:
-    allowed_origins = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "*"
-    ]
+    allowed_origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=False if "*" in allowed_origins else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -68,16 +88,20 @@ app.add_middleware(
 app.mount("/static/inspections", StaticFiles(directory=str(INSPECTIONS_DIR)), name="inspections")
 
 # Initialize PaddleOCR engine globally once
+ocr_engine = None
+ocr_init_error: Optional[str] = None
+
 if PaddleOCR is not None:
-    logger.info("Initializing PaddleOCR GPU engine...")
+    logger.info("Initializing PaddleOCR engine...")
     try:
         ocr_engine = PaddleOCR(lang="en")
         logger.info("PaddleOCR engine initialized successfully.")
     except Exception as e:
-        logger.error(f"Error initializing PaddleOCR engine: {e}")
+        ocr_init_error = str(e)
+        logger.error(f"Error initializing PaddleOCR engine: {e}", exc_info=True)
         ocr_engine = None
 else:
-    logger.info("PaddleOCR package not installed; running in mock/demo OCR mode.")
+    logger.warning(f"PaddleOCR package unavailable (import error: {paddleocr_import_error}).")
     ocr_engine = None
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -206,7 +230,23 @@ def read_root():
         "subtitle": "Legal Metrology Inspection System",
         "service": "SAHARA OCR, Nemotron Normalization & Legal Compliance Backend",
         "engine": "PaddleOCR + NVIDIA Nemotron 3 Ultra 550B + PCR 2011 Compliance Evaluator",
-        "phases": ["Phase 1 (Frontend)", "Phase 2 (OCR & Nemotron)", "Phase 3 (Legal Metrology Compliance Engine)"]
+        "paddle_paddle_version": paddle_version,
+        "paddle_ocr_version": paddleocr_version,
+        "paddlex_version": paddlex_version,
+        "paddle_ocr_initialized": ocr_engine is not None,
+        "paddle_ocr_error": paddleocr_import_error or ocr_init_error,
+        "phases": ["Phase 1 (Frontend)", "Phase 2 (OCR & Nemotron)", "Phase 3 (Legal Metrology Compliance Engine)", "Phase 4 (Summary & PDF)", "Phase 5 (Workstation & Mobile)"]
+    }
+
+
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "ocr_engine_available": ocr_engine is not None,
+        "paddle_ocr_error": paddleocr_import_error or ocr_init_error,
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -230,9 +270,15 @@ async def process_ocr(
     Returns raw OCR JSON.
     """
     if ocr_engine is None:
+        err_detail = "PaddleOCR engine is not initialized on the server."
+        if paddleocr_import_error:
+            err_detail += f" (Import error: {paddleocr_import_error})"
+        elif ocr_init_error:
+            err_detail += f" (Init error: {ocr_init_error})"
+        logger.error(err_detail)
         raise HTTPException(
             status_code=500,
-            detail="PaddleOCR engine is not initialized on the server."
+            detail=err_detail
         )
 
     target_file = file or image
@@ -299,7 +345,22 @@ async def process_ocr(
             rec_boxes = res0.get("rec_boxes", [])
 
             for idx, (txt, score, box) in enumerate(zip(rec_texts, rec_scores, rec_boxes)):
-                bbox_coords = [int(box[0]), int(box[1]), int(box[2]), int(box[3])]
+                try:
+                    if hasattr(box, "tolist"):
+                        box_list = box.tolist()
+                    else:
+                        box_list = list(box)
+                    if len(box_list) == 4 and isinstance(box_list[0], (int, float)):
+                        bbox_coords = [int(box_list[0]), int(box_list[1]), int(box_list[2]), int(box_list[3])]
+                    elif len(box_list) >= 4 and isinstance(box_list[0], (list, tuple)):
+                        xs = [pt[0] for pt in box_list]
+                        ys = [pt[1] for pt in box_list]
+                        bbox_coords = [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
+                    else:
+                        bbox_coords = [int(b) for b in box_list[:4]]
+                except Exception:
+                    bbox_coords = [0, 0, 100, 50]
+
                 ocr_regions.append({
                     "id": f"ocr_{idx + 1:03d}",
                     "text": str(txt).strip(),
@@ -562,20 +623,32 @@ def get_inspection_record(inspection_id: str):
     compliance_data = None
 
     if meta_file.exists():
-        with open(meta_file, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+        except Exception:
+            pass
 
     if ocr_file.exists():
-        with open(ocr_file, "r", encoding="utf-8") as f:
-            ocr_data = json.load(f)
+        try:
+            with open(ocr_file, "r", encoding="utf-8") as f:
+                ocr_data = json.load(f)
+        except Exception:
+            pass
 
     if norm_file.exists():
-        with open(norm_file, "r", encoding="utf-8") as f:
-            normalized_data = json.load(f)
+        try:
+            with open(norm_file, "r", encoding="utf-8") as f:
+                normalized_data = json.load(f)
+        except Exception:
+            pass
 
     if comp_file.exists():
-        with open(comp_file, "r", encoding="utf-8") as f:
-            compliance_data = json.load(f)
+        try:
+            with open(comp_file, "r", encoding="utf-8") as f:
+                compliance_data = json.load(f)
+        except Exception:
+            pass
 
     return {
         "metadata": metadata,
@@ -645,21 +718,30 @@ def get_inspection_summary_endpoint(inspection_id: str):
     meta = {}
     meta_file = insp_folder / "metadata.json"
     if meta_file.exists():
-        with open(meta_file, "r", encoding="utf-8") as f:
-            meta = json.load(f)
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except Exception:
+            pass
 
     # Load product data
     product_data = None
     norm_file = insp_folder / "normalized" / "product_data.json"
     if norm_file.exists():
-        with open(norm_file, "r", encoding="utf-8") as f:
-            product_data = StructuredProductData.model_validate_json(f.read())
+        try:
+            with open(norm_file, "r", encoding="utf-8") as f:
+                product_data = StructuredProductData.model_validate_json(f.read())
+        except Exception:
+            pass
 
     # Load or run compliance
     comp_file = insp_folder / "compliance" / "compliance_result.json"
     if comp_file.exists():
-        with open(comp_file, "r", encoding="utf-8") as f:
-            compliance = ComplianceResult.model_validate_json(f.read())
+        try:
+            with open(comp_file, "r", encoding="utf-8") as f:
+                compliance = ComplianceResult.model_validate_json(f.read())
+        except Exception:
+            compliance = run_compliance_evaluation(inspection_id)
     else:
         compliance = run_compliance_evaluation(inspection_id)
 

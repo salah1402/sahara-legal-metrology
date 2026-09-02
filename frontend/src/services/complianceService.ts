@@ -10,8 +10,9 @@ export async function evaluateCompliance(
   inspectionDate?: string
 ): Promise<ComplianceResult> {
   const config = getApiConfig();
+  const base = config.baseUrl.replace(/\/+$/, '');
 
-  const response = await fetch(`${config.baseUrl}/compliance`, {
+  const response = await fetch(`${base}/api/compliance`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -43,9 +44,10 @@ export async function evaluateCompliance(
  */
 export async function getInspectionCompliance(inspectionId: string): Promise<ComplianceResult | null> {
   const config = getApiConfig();
+  const base = config.baseUrl.replace(/\/+$/, '');
 
   try {
-    const response = await fetch(`${config.baseUrl}/inspections/${inspectionId}/compliance`);
+    const response = await fetch(`${base}/api/inspections/${inspectionId}/compliance`);
     if (response.ok) {
       return await response.json();
     }

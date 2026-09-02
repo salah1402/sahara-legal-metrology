@@ -14,7 +14,7 @@ export async function parseInstruction(
   // If backend is active and demo fixtures mode is explicitly disabled, call real backend
   if (!config.useDemoFixtures) {
     try {
-      const response = await request<InstructionParseResponse>('/instructions/parse', {
+      const response = await request<InstructionParseResponse>('/api/instructions/parse', {
         method: 'POST',
         body: JSON.stringify({ prompt, context }),
       });

@@ -96,7 +96,7 @@ export async function getInspectionOCR(inspectionId: string): Promise<OCRRespons
   const config = getApiConfig();
 
   try {
-    const url = `${config.baseUrl.replace(/\/+$/, '')}/inspections/${inspectionId}`;
+    const url = `${config.baseUrl.replace(/\/+$/, '')}/api/inspections/${inspectionId}`;
     const response = await fetch(url);
     if (response.ok) {
       const data = await response.json();

@@ -21,7 +21,7 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
 
   if (!config.useDemoFixtures) {
     try {
-      const response = await fetch(`${config.baseUrl}/auth/login`, {
+      const response = await fetch(`${config.baseUrl.replace(/\/+$/, '')}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
