@@ -3,6 +3,8 @@ import sys
 import uuid
 import json
 import re
+import gc
+import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,8 +15,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from PIL import Image, ImageOps
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sahara_backend")
+
+
+def get_current_rss_mb() -> float:
+    """Returns current process Resident Set Size (RAM) in megabytes."""
+    try:
+        import psutil
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+    except Exception:
+        return 0.0
+
 
 # --------------------------------------------------------------------
 # PaddlePaddle, PaddleX & PaddleOCR Version & Import Detection
@@ -25,6 +39,12 @@ paddleocr_version = "not installed"
 
 try:
     import paddle  # type: ignore
+    # Force CPU execution & cap thread pool to prevent RAM spikes on Render Free
+    paddle.set_device("cpu")
+    try:
+        paddle.set_num_threads(2)
+    except Exception:
+        pass
     paddle_version = getattr(paddle, "__version__", "unknown")
 except Exception as e:
     paddle_version = f"not loaded ({e})"
@@ -87,15 +107,24 @@ app.add_middleware(
 # Mount inspections directory for static image retrieval
 app.mount("/static/inspections", StaticFiles(directory=str(INSPECTIONS_DIR)), name="inspections")
 
-# Initialize PaddleOCR engine globally once
+# Initialize PaddleOCR engine globally once with lightweight CPU configuration
 ocr_engine = None
 ocr_init_error: Optional[str] = None
+ocr_lock = asyncio.Lock()
 
 if PaddleOCR is not None:
-    logger.info("Initializing PaddleOCR engine...")
+    logger.info("Initializing lightweight CPU PaddleOCR engine (PP-OCRv4 mobile)...")
     try:
-        ocr_engine = PaddleOCR(lang="en")
-        logger.info("PaddleOCR engine initialized successfully.")
+        ocr_engine = PaddleOCR(
+            lang="en",
+            ocr_version="PP-OCRv4",
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False,
+            text_det_limit_side_len=960,
+            text_recognition_batch_size=1
+        )
+        logger.info(f"PaddleOCR engine initialized successfully (Process RSS: {get_current_rss_mb():.1f} MB).")
     except Exception as e:
         ocr_init_error = str(e)
         logger.error(f"Error initializing PaddleOCR engine: {e}", exc_info=True)
@@ -331,52 +360,102 @@ async def process_ocr(
         logger.error(f"Failed to save uploaded image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {str(e)}")
 
-    # Execute PaddleOCR inference
+    # Execute PaddleOCR inference with memory protection and concurrency lock
     created_at_iso = datetime.now(timezone.utc).isoformat()
-    try:
-        logger.info(f"Running PaddleOCR on {saved_image_path} (Inspection: {inspection_id})...")
-        prediction = ocr_engine.predict(str(saved_image_path))
+    
+    async with ocr_lock:
+        rss_start = get_current_rss_mb()
+        logger.info(f"Acquired OCR lock for {inspection_id} (Process RSS: {rss_start:.1f} MB)...")
+        
+        # Preprocess image: scale down to max 1280px to protect memory buffers
+        scale_x, scale_y = 1.0, 1.0
+        ocr_input_path = saved_image_path
+        temp_proc_path: Optional[Path] = None
 
-        ocr_regions = []
-        if prediction and len(prediction) > 0:
-            res0 = prediction[0]
-            rec_texts = res0.get("rec_texts", [])
-            rec_scores = res0.get("rec_scores", [])
-            rec_boxes = res0.get("rec_boxes", [])
+        try:
+            with Image.open(saved_image_path) as pil_img:
+                pil_img = ImageOps.exif_transpose(pil_img) or pil_img
+                orig_w, orig_h = pil_img.size
+                MAX_OCR_DIM = 1280
+                if max(orig_w, orig_h) > MAX_OCR_DIM:
+                    scale = MAX_OCR_DIM / max(orig_w, orig_h)
+                    new_w, new_h = max(1, int(orig_w * scale)), max(1, int(orig_h * scale))
+                    resized = pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                    scale_x = orig_w / new_w
+                    scale_y = orig_h / new_h
+                    temp_proc_path = images_folder / f"proc_{saved_filename}.jpg"
+                    resized.convert("RGB").save(temp_proc_path, "JPEG", quality=85)
+                    ocr_input_path = temp_proc_path
+                    del resized
+                    logger.info(f"Downscaled image for OCR from {orig_w}x{orig_h} to {new_w}x{new_h} (Scale: {scale_x:.2f}, {scale_y:.2f})")
+                else:
+                    scale_x, scale_y = 1.0, 1.0
+        except Exception as img_err:
+            logger.warning(f"Could not resize image for OCR: {img_err}. Using original image.")
+            ocr_input_path = saved_image_path
+            scale_x, scale_y = 1.0, 1.0
 
-            for idx, (txt, score, box) in enumerate(zip(rec_texts, rec_scores, rec_boxes)):
+        try:
+            logger.info(f"Running PaddleOCR on {ocr_input_path} (Inspection: {inspection_id})...")
+            prediction = ocr_engine.predict(str(ocr_input_path))
+
+            ocr_regions = []
+            if prediction and len(prediction) > 0:
+                res0 = prediction[0]
+                rec_texts = res0.get("rec_texts", [])
+                rec_scores = res0.get("rec_scores", [])
+                rec_boxes = res0.get("rec_boxes", [])
+
+                for idx, (txt, score, box) in enumerate(zip(rec_texts, rec_scores, rec_boxes)):
+                    try:
+                        if hasattr(box, "tolist"):
+                            box_list = box.tolist()
+                        else:
+                            box_list = list(box)
+                        if len(box_list) == 4 and isinstance(box_list[0], (int, float)):
+                            raw_bbox = [int(box_list[0]), int(box_list[1]), int(box_list[2]), int(box_list[3])]
+                        elif len(box_list) >= 4 and isinstance(box_list[0], (list, tuple)):
+                            xs = [pt[0] for pt in box_list]
+                            ys = [pt[1] for pt in box_list]
+                            raw_bbox = [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
+                        else:
+                            raw_bbox = [int(b) for b in box_list[:4]]
+                        
+                        # Rescale coordinates back to original image dimensions
+                        bbox_coords = [
+                            int(raw_bbox[0] * scale_x),
+                            int(raw_bbox[1] * scale_y),
+                            int(raw_bbox[2] * scale_x),
+                            int(raw_bbox[3] * scale_y)
+                        ]
+                    except Exception:
+                        bbox_coords = [0, 0, 100, 50]
+
+                    ocr_regions.append({
+                        "id": f"ocr_{idx + 1:03d}",
+                        "text": str(txt).strip(),
+                        "confidence": round(float(score), 4),
+                        "bbox": bbox_coords,
+                        "image_id": "IMG-001"
+                    })
+
+            logger.info(f"PaddleOCR detected {len(ocr_regions)} text regions.")
+
+        except Exception as e:
+            logger.error(f"PaddleOCR inference failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"PaddleOCR engine failed during image processing: {str(e)}"
+            )
+        finally:
+            if temp_proc_path and temp_proc_path.exists():
                 try:
-                    if hasattr(box, "tolist"):
-                        box_list = box.tolist()
-                    else:
-                        box_list = list(box)
-                    if len(box_list) == 4 and isinstance(box_list[0], (int, float)):
-                        bbox_coords = [int(box_list[0]), int(box_list[1]), int(box_list[2]), int(box_list[3])]
-                    elif len(box_list) >= 4 and isinstance(box_list[0], (list, tuple)):
-                        xs = [pt[0] for pt in box_list]
-                        ys = [pt[1] for pt in box_list]
-                        bbox_coords = [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
-                    else:
-                        bbox_coords = [int(b) for b in box_list[:4]]
+                    temp_proc_path.unlink()
                 except Exception:
-                    bbox_coords = [0, 0, 100, 50]
-
-                ocr_regions.append({
-                    "id": f"ocr_{idx + 1:03d}",
-                    "text": str(txt).strip(),
-                    "confidence": round(float(score), 4),
-                    "bbox": bbox_coords,
-                    "image_id": "IMG-001"
-                })
-
-        logger.info(f"PaddleOCR detected {len(ocr_regions)} text regions.")
-
-    except Exception as e:
-        logger.error(f"PaddleOCR inference failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"PaddleOCR engine failed during image processing: {str(e)}"
-        )
+                    pass
+            gc.collect()
+            rss_end = get_current_rss_mb()
+            logger.info(f"Released OCR inference resources for {inspection_id}. Process RSS: {rss_end:.1f} MB (Delta: {rss_end - rss_start:+.1f} MB).")
 
     # Build raw OCR response
     raw_ocr_response = {
