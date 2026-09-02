@@ -28,7 +28,7 @@ export async function processOCR(file: File | Blob, inspectionId?: string): Prom
     formData.append('inspection_id_param', inspectionId);
   }
 
-  const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/ocr`;
+  const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/api/ocr`;
 
   try {
     const response = await fetch(endpoint, {
