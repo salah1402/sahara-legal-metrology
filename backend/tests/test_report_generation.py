@@ -51,7 +51,7 @@ from backend.services.summary_service import (
     is_prompt_leakage,
     sanitize_summary_text
 )
-from backend.services.report_service import generate_inspection_pdf
+from backend.services.report_service import generate_inspection_pdf, generate_pdf_filename
 
 
 def make_evidence(text: str, conf: float = 0.98, img_id: str = "IMG-001") -> Evidence:
@@ -339,6 +339,31 @@ class TestInspectionReportGeneration(unittest.TestCase):
         pdf_bytes = generate_inspection_pdf(self.test_insp_id)
         self.assertIsNotNone(pdf_bytes)
         self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+
+    def test_16_generate_pdf_filename_sanitization(self):
+        """Test dynamic filename generation and character sanitization."""
+        # 1. Standard name
+        fn1 = generate_pdf_filename("Ac QI80", "INS-100")
+        self.assertEqual(fn1, "SAHARA_Ac_QI80_Inspection_Report.pdf")
+
+        # 2. Name with dashes, hyphens, em-dashes
+        fn2 = generate_pdf_filename("Bourbon Biscuits — Britannia", "INS-200")
+        self.assertEqual(fn2, "SAHARA_Bourbon_Biscuits_Britannia_Inspection_Report.pdf")
+
+        # 3. Name with Windows illegal characters
+        fn3 = generate_pdf_filename('Test/Product:Package*Name?"<1>|', "INS-300")
+        self.assertEqual(fn3, "SAHARA_Test_Product_Package_Name_1_Inspection_Report.pdf")
+
+        # 4. Empty / None fallback
+        fn4 = generate_pdf_filename("", "INS-400")
+        self.assertEqual(fn4, "SAHARA_Inspection_INS-400.pdf")
+
+        fn5 = generate_pdf_filename(None, "INS-500")
+        self.assertEqual(fn5, "SAHARA_Inspection_INS-500.pdf")
+
+        # 5. Untitled Inspection fallback
+        fn6 = generate_pdf_filename("Untitled Inspection", "INS-600")
+        self.assertEqual(fn6, "SAHARA_Inspection_INS-600.pdf")
 
 
 if __name__ == "__main__":

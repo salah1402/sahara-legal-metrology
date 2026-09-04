@@ -23,7 +23,7 @@ import {
 import { formatDate, getInspectionDisplayTitle } from '../../utils/formatters';
 import { showToast } from '../../hooks/useToast';
 import { evaluateCompliance } from '../../services/complianceService';
-import { exportInspectionPDF, triggerBlobDownload, getInspectionSummary } from '../../services/reportService';
+import { exportInspectionPDF, triggerBlobDownload, getInspectionSummary, generatePdfFilename } from '../../services/reportService';
 import { clsx } from 'clsx';
 
 export interface OCRResultViewProps {
@@ -149,7 +149,8 @@ export const OCRResultView: React.FC<OCRResultViewProps> = ({
     setIsExportingPdf(true);
     try {
       const blob = await exportInspectionPDF(record.id);
-      const filename = `SAHARA_Inspection_${record.id}.pdf`;
+      const displayTitle = getInspectionDisplayTitle(record.metadata);
+      const filename = generatePdfFilename(displayTitle, record.id);
       triggerBlobDownload(blob, filename);
       showToast('success', 'PDF Export Ready', `Downloaded official report: ${filename}`);
     } catch (e: any) {

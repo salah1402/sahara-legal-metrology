@@ -133,7 +133,7 @@ export function formatProductCompositeTitle(commodity?: string | null, brandOrMf
 export function getInspectionDisplayTitle(meta?: { display_name?: string; product_name?: string; inspection_id?: string }): string {
   if (!meta) return 'Untitled Inspection';
   if (meta.display_name && meta.display_name.trim()) {
-    return cleanDisplayProductName(meta.display_name.trim());
+    return meta.display_name.trim();
   }
   if (meta.product_name && meta.product_name.trim() && meta.product_name !== 'Untitled Inspection') {
     return cleanDisplayProductName(meta.product_name.trim());

@@ -1,4 +1,5 @@
 import io
+import re
 import json
 import logging
 from pathlib import Path
@@ -148,6 +149,38 @@ def format_canonical_verdict(overall_status: str) -> str:
     elif overall_status == "NEEDS_REVIEW":
         return "NEEDS REVIEW"
     return overall_status.replace("_", " ")
+
+
+def generate_pdf_filename(inspection_name: Optional[str], inspection_id: str) -> str:
+    """
+    Generates a sanitized filename based on the inspection name shown in the application.
+    Examples:
+        'Ac QI80' -> 'SAHARA_Ac_QI80_Inspection_Report.pdf'
+        'Bourbon Biscuits — Britannia' -> 'SAHARA_Bourbon_Biscuits_Britannia_Inspection_Report.pdf'
+        None / '' / 'Untitled Inspection' -> 'SAHARA_Inspection_INS-20260904-XXXX.pdf'
+    """
+    if not inspection_name or not str(inspection_name).strip():
+        return f"SAHARA_Inspection_{inspection_id}.pdf"
+
+    clean = str(inspection_name).strip()
+    if clean.lower() in ["untitled inspection", "untitled", "packaged commodity"]:
+        return f"SAHARA_Inspection_{inspection_id}.pdf"
+
+    # Replace dashes and punctuation with underscores
+    clean = clean.replace("—", "_").replace("–", "_").replace("-", "_")
+    # Replace invalid Windows filename characters: \ / : * ? " < > |
+    clean = re.sub(r'[\\/*?:"<>|]', '_', clean)
+    # Replace whitespace with underscores
+    clean = re.sub(r'\s+', '_', clean)
+    # Remove non-alphanumeric characters except underscores
+    clean = re.sub(r'[^\w_]', '', clean)
+    # Collapse multiple consecutive underscores and trim
+    clean = re.sub(r'_+', '_', clean).strip('_')
+
+    if not clean:
+        return f"SAHARA_Inspection_{inspection_id}.pdf"
+
+    return f"SAHARA_{clean}_Inspection_Report.pdf"
 
 
 def find_inspection_image(
@@ -331,8 +364,11 @@ def generate_inspection_pdf(
         compliance = run_compliance_evaluation(inspection_id)
 
     # 4. Derive Clean Display Product Name
-    raw_display = metadata.get("display_name") or metadata.get("product_name") or "Packaged Commodity"
-    display_title = clean_display_product_name(raw_display)
+    if metadata.get("display_name") and str(metadata["display_name"]).strip():
+        display_title = str(metadata["display_name"]).strip()
+    else:
+        raw_display = metadata.get("product_name") or "Packaged Commodity"
+        display_title = clean_display_product_name(raw_display)
 
     # 5. Generate Executive Summary (strictly sanitized)
     summary_text, summary_source = generate_inspection_summary(compliance, product_data, display_title)
@@ -374,7 +410,12 @@ def generate_inspection_pdf(
     ]))
     story.append(header_table)
     story.append(Spacer(1, 4))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1E3A8A'), spaceAfter=6))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1E3A8A'), spaceAfter=5))
+
+    # --- Uploaded Package Image (Top of Page 1) ---
+    resolved_image = find_inspection_image(insp_folder, image_data)
+    story.extend(create_uploaded_image_flowables(resolved_image, styles))
+    story.append(Spacer(1, 5))
 
     # --- Commodity Metadata Card ---
     product_name_str = display_title
@@ -514,11 +555,6 @@ def generate_inspection_pdf(
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
     story.append(findings_box)
-
-    # --- Uploaded Package Image Section ---
-    story.append(Spacer(1, 4))
-    resolved_image = find_inspection_image(insp_folder, image_data)
-    story.extend(create_uploaded_image_flowables(resolved_image, styles))
 
     # =========================================================================
     # PAGE BREAK -> PAGE 2: Full Statutory Audit Table & Traceability

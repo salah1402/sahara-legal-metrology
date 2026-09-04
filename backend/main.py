@@ -242,7 +242,7 @@ def resolve_display_name(meta: Dict[str, Any]) -> str:
     NEVER uses random generated names, hash noise, or inspection IDs as display title.
     """
     if meta.get("display_name") and str(meta["display_name"]).strip():
-        return clean_display_product_name(str(meta["display_name"]).strip())
+        return str(meta["display_name"]).strip()
     if meta.get("product_name") and str(meta["product_name"]).strip() and meta["product_name"] != "Untitled Inspection":
         return clean_display_product_name(str(meta["product_name"]).strip())
     return "Untitled Inspection"
@@ -849,11 +849,29 @@ def export_inspection_pdf_endpoint(inspection_id: str):
         raise HTTPException(status_code=500, detail=f"PDF report generation failed: {str(e)}")
 
     pdf_file_path = insp_folder / "report" / "inspection_report.pdf"
-    
+
+    # Derive dynamic download filename from inspection display name
+    meta_file = insp_folder / "metadata.json"
+    meta: Dict[str, Any] = {}
+    if meta_file.exists():
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except Exception:
+            pass
+
+    display_title = resolve_display_name(meta)
+    from backend.services.report_service import generate_pdf_filename
+    download_filename = generate_pdf_filename(display_title, inspection_id)
+
     return FileResponse(
         path=str(pdf_file_path),
         media_type="application/pdf",
-        filename=f"SAHARA_Inspection_{inspection_id}.pdf"
+        filename=download_filename,
+        headers={
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Content-Disposition": f'attachment; filename="{download_filename}"'
+        }
     )
 
 

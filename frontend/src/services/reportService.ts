@@ -34,6 +34,30 @@ export async function exportInspectionPDF(inspectionId: string): Promise<Blob> {
   return response.blob();
 }
 
+export function generatePdfFilename(inspectionName: string | undefined | null, inspectionId: string): string {
+  if (!inspectionName || !inspectionName.trim()) {
+    return `SAHARA_Inspection_${inspectionId}.pdf`;
+  }
+  const cleanName = inspectionName.trim();
+  if (cleanName.toLowerCase() === 'untitled inspection' || cleanName.toLowerCase() === 'untitled' || cleanName.toLowerCase() === 'packaged commodity') {
+    return `SAHARA_Inspection_${inspectionId}.pdf`;
+  }
+
+  const sanitized = cleanName
+    .replace(/[—–\-]/g, '_')
+    .replace(/[\\/*?:"<>|]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/[^\w_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!sanitized) {
+    return `SAHARA_Inspection_${inspectionId}.pdf`;
+  }
+
+  return `SAHARA_${sanitized}_Inspection_Report.pdf`;
+}
+
 export function triggerBlobDownload(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
