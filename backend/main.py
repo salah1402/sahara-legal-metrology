@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
+# Ensure workspace root is in sys.path so `uvicorn main:app` inside backend/ works cleanly
+_pkg_root = str(Path(__file__).resolve().parent.parent)
+if _pkg_root not in sys.path:
+    sys.path.insert(0, _pkg_root)
+
 # Configure low-memory CPU runtime environment flags for Paddle & BLAS
 os.environ["FLAGS_eager_delete_tensor_gb"] = "0.0"
 os.environ["FLAGS_fast_eager_deletion_mode"] = "1"
@@ -39,41 +44,21 @@ def get_current_rss_mb() -> float:
 
 
 # --------------------------------------------------------------------
-# PaddlePaddle, PaddleX & PaddleOCR Version & Import Detection
+# Ultra-Lightweight ONNX OCR Engine (Render Free 512MB CPU Optimized)
 # --------------------------------------------------------------------
-paddle_version = "not installed"
-paddlex_version = "not installed"
-paddleocr_version = "not installed"
+RapidOCR = None
+rapidocr_version = "not installed"
+rapidocr_import_error: Optional[str] = None
 
 try:
-    import paddle  # type: ignore
-    paddle.set_device("cpu")
-    try:
-        paddle.set_num_threads(1)
-    except Exception:
-        pass
-    paddle_version = getattr(paddle, "__version__", "unknown")
+    from rapidocr_onnxruntime import RapidOCR  # type: ignore
+    import rapidocr_onnxruntime as r_mod
+    rapidocr_version = getattr(r_mod, "__version__", "1.4.x")
+    logger.info(f"RapidOCR (PP-OCRv4 ONNX) imported successfully (version: {rapidocr_version})")
 except Exception as e:
-    paddle_version = f"not loaded ({e})"
-
-try:
-    import paddlex  # type: ignore
-    paddlex_version = getattr(paddlex, "__version__", "unknown")
-except Exception as e:
-    paddlex_version = f"not loaded ({e})"
-
-PaddleOCR = None
-paddleocr_import_error: Optional[str] = None
-
-try:
-    from paddleocr import PaddleOCR  # type: ignore
-    p_mod = sys.modules.get("paddleocr")
-    paddleocr_version = getattr(p_mod, "__version__", "3.x")
-    logger.info(f"PaddleOCR imported successfully (PaddlePaddle: {paddle_version}, PaddleOCR: {paddleocr_version}, PaddleX: {paddlex_version})")
-except Exception as e:
-    paddleocr_import_error = str(e)
-    logger.error(f"Failed to import PaddleOCR: {e}", exc_info=True)
-    PaddleOCR = None
+    rapidocr_import_error = str(e)
+    logger.error(f"Failed to import RapidOCR: {e}", exc_info=True)
+    RapidOCR = None
 
 from backend.models.schemas import (
     OCRRegion,
@@ -114,36 +99,28 @@ app.add_middleware(
 # Mount inspections directory for static image retrieval
 app.mount("/static/inspections", StaticFiles(directory=str(INSPECTIONS_DIR)), name="inspections")
 
-# Lazy Singleton PaddleOCR Engine with Lightweight Mobile CPU Configuration
+# Lazy Singleton RapidOCR Engine (<100MB RAM, CPU Optimized)
 _ocr_engine = None
 _ocr_init_error: Optional[str] = None
 ocr_lock = asyncio.Lock()
 
 
 def get_ocr_engine():
-    """Lazily initializes and returns the shared singleton PaddleOCR engine."""
+    """Lazily initializes and returns the shared singleton RapidOCR engine."""
     global _ocr_engine, _ocr_init_error
     if _ocr_engine is not None:
         return _ocr_engine
-    if PaddleOCR is None:
-        raise RuntimeError(f"PaddleOCR package is not available: {paddleocr_import_error}")
+    if RapidOCR is None:
+        raise RuntimeError(f"RapidOCR package is not available: {rapidocr_import_error}")
 
-    logger.info("Initializing lazy singleton PaddleOCR engine (PP-OCRv4 mobile, CPU)...")
+    logger.info("Initializing lazy singleton RapidOCR engine (PP-OCRv4 ONNX CPU)...")
     try:
-        _ocr_engine = PaddleOCR(
-            lang="en",
-            ocr_version="PP-OCRv4",
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False,
-            text_det_limit_side_len=720,
-            text_recognition_batch_size=1
-        )
-        logger.info(f"PaddleOCR engine initialized successfully (Process RSS: {get_current_rss_mb():.1f} MB).")
+        _ocr_engine = RapidOCR()
+        logger.info(f"RapidOCR engine initialized successfully (Process RSS: {get_current_rss_mb():.1f} MB).")
         return _ocr_engine
     except Exception as e:
         _ocr_init_error = str(e)
-        logger.error(f"Error initializing PaddleOCR engine: {e}", exc_info=True)
+        logger.error(f"Error initializing RapidOCR engine: {e}", exc_info=True)
         raise
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -271,12 +248,10 @@ def read_root():
         "product": "SAHARA",
         "subtitle": "Legal Metrology Inspection System",
         "service": "SAHARA OCR, Nemotron Normalization & Legal Compliance Backend",
-        "engine": "PaddleOCR + NVIDIA Nemotron 3 Ultra 550B + PCR 2011 Compliance Evaluator",
-        "paddle_paddle_version": paddle_version,
-        "paddle_ocr_version": paddleocr_version,
-        "paddlex_version": paddlex_version,
-        "paddle_ocr_initialized": _ocr_engine is not None,
-        "paddle_ocr_error": paddleocr_import_error or _ocr_init_error,
+        "engine": "RapidOCR (PP-OCRv4 ONNX) + NVIDIA Nemotron 3 Ultra 550B + PCR 2011 Compliance Evaluator",
+        "ocr_version": rapidocr_version,
+        "ocr_initialized": _ocr_engine is not None,
+        "ocr_error": rapidocr_import_error or _ocr_init_error,
         "phases": ["Phase 1 (Frontend)", "Phase 2 (OCR & Nemotron)", "Phase 3 (Legal Metrology Compliance Engine)", "Phase 4 (Summary & PDF)", "Phase 5 (Workstation & Mobile)"]
     }
 
@@ -286,9 +261,10 @@ def read_root():
 def health_check():
     return {
         "status": "healthy",
-        "ocr_engine_available": PaddleOCR is not None,
+        "ocr_engine_available": RapidOCR is not None,
         "ocr_engine_loaded": _ocr_engine is not None,
-        "paddle_ocr_error": paddleocr_import_error or _ocr_init_error,
+        "ocr_version": rapidocr_version,
+        "ocr_error": rapidocr_import_error or _ocr_init_error,
         "process_rss_mb": round(get_current_rss_mb(), 1),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
@@ -309,12 +285,12 @@ async def process_ocr(
     """
     POST /api/ocr
     Accepts an uploaded image file via multipart/form-data.
-    Performs PaddleOCR detection and text recognition with low-memory CPU safeguards.
+    Performs RapidOCR (PP-OCRv4 ONNX) detection and text recognition with low-memory CPU safeguards.
     Saves raw OCR evidence into `ocr/raw_ocr.json`.
     Returns raw OCR JSON.
     """
-    if PaddleOCR is None:
-        err_detail = f"PaddleOCR package is unavailable on the server ({paddleocr_import_error})."
+    if RapidOCR is None:
+        err_detail = f"OCR engine package is unavailable on the server ({rapidocr_import_error})."
         logger.error(err_detail)
         raise HTTPException(status_code=500, detail=err_detail)
 
@@ -369,14 +345,14 @@ async def process_ocr(
         logger.error(f"Failed to save uploaded image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {str(e)}")
 
-    # Execute PaddleOCR inference with memory protection and concurrency serialization
+    # Execute RapidOCR inference with memory protection and concurrency serialization
     created_at_iso = datetime.now(timezone.utc).isoformat()
     
     async with ocr_lock:
         rss_start = get_current_rss_mb()
         logger.info(f"Acquired OCR lock for {inspection_id} (Process RSS: {rss_start:.1f} MB)...")
         
-        # Preprocess image: scale down to max 1024px to prevent memory spikes on Render Free
+        # Preprocess image: scale down to max 1280px to protect memory buffers
         scale_x, scale_y = 1.0, 1.0
         ocr_input_path = saved_image_path
         temp_proc_path: Optional[Path] = None
@@ -385,7 +361,7 @@ async def process_ocr(
             with Image.open(saved_image_path) as pil_img:
                 pil_img = ImageOps.exif_transpose(pil_img) or pil_img
                 orig_w, orig_h = pil_img.size
-                MAX_OCR_DIM = 1024
+                MAX_OCR_DIM = 1280
                 if max(orig_w, orig_h) > MAX_OCR_DIM:
                     scale = MAX_OCR_DIM / max(orig_w, orig_h)
                     new_w, new_h = max(1, int(orig_w * scale)), max(1, int(orig_h * scale))
@@ -406,32 +382,20 @@ async def process_ocr(
 
         try:
             engine = get_ocr_engine()
-            logger.info(f"Running PaddleOCR on {ocr_input_path} (Inspection: {inspection_id})...")
-            prediction = engine.predict(str(ocr_input_path))
+            logger.info(f"Running RapidOCR on {ocr_input_path} (Inspection: {inspection_id})...")
+            result, elapse_list = engine(str(ocr_input_path))
 
             ocr_regions = []
-            if prediction and len(prediction) > 0:
-                res0 = prediction[0]
-                rec_texts = res0.get("rec_texts", [])
-                rec_scores = res0.get("rec_scores", [])
-                rec_boxes = res0.get("rec_boxes", [])
-
-                for idx, (txt, score, box) in enumerate(zip(rec_texts, rec_scores, rec_boxes)):
+            if result:
+                for idx, item in enumerate(result):
                     try:
-                        if hasattr(box, "tolist"):
-                            box_list = box.tolist()
-                        else:
-                            box_list = list(box)
-                        if len(box_list) == 4 and isinstance(box_list[0], (int, float)):
-                            raw_bbox = [int(box_list[0]), int(box_list[1]), int(box_list[2]), int(box_list[3])]
-                        elif len(box_list) >= 4 and isinstance(box_list[0], (list, tuple)):
-                            xs = [pt[0] for pt in box_list]
-                            ys = [pt[1] for pt in box_list]
-                            raw_bbox = [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
-                        else:
-                            raw_bbox = [int(b) for b in box_list[:4]]
-                        
-                        # Rescale coordinates back to original image dimensions
+                        # item format: [box_points, text, score]
+                        pts = item[0]
+                        txt = str(item[1]).strip()
+                        score = float(item[2])
+                        xs = [p[0] for p in pts]
+                        ys = [p[1] for p in pts]
+                        raw_bbox = [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
                         bbox_coords = [
                             int(raw_bbox[0] * scale_x),
                             int(raw_bbox[1] * scale_y),
@@ -440,19 +404,20 @@ async def process_ocr(
                         ]
                     except Exception:
                         bbox_coords = [0, 0, 100, 50]
+                        txt = str(item[1]) if len(item) > 1 else ""
+                        score = float(item[2]) if len(item) > 2 else 0.8
 
                     ocr_regions.append({
                         "id": f"ocr_{idx + 1:03d}",
-                        "text": str(txt).strip(),
-                        "confidence": round(float(score), 4),
+                        "text": txt,
+                        "confidence": round(score, 4),
                         "bbox": bbox_coords,
                         "image_id": "IMG-001"
                     })
 
-                del res0
-                del prediction
+                del result
 
-            logger.info(f"PaddleOCR detected {len(ocr_regions)} text regions.")
+            logger.info(f"RapidOCR detected {len(ocr_regions)} text regions.")
 
         except (MemoryError, RuntimeError) as oom_err:
             logger.error(f"OCR memory/runtime constraint error: {oom_err}", exc_info=True)
@@ -462,10 +427,10 @@ async def process_ocr(
                 detail="The OCR engine encountered a memory constraint processing this image. Please try a smaller or pre-cropped image."
             )
         except Exception as e:
-            logger.error(f"PaddleOCR inference failed: {e}", exc_info=True)
+            logger.error(f"RapidOCR inference failed: {e}", exc_info=True)
             raise HTTPException(
                 status_code=500,
-                detail=f"PaddleOCR engine failed during image processing: {str(e)}"
+                detail=f"OCR engine failed during image processing: {str(e)}"
             )
         finally:
             if temp_proc_path and temp_proc_path.exists():
@@ -481,7 +446,7 @@ async def process_ocr(
     raw_ocr_response = {
         "inspection_id": inspection_id,
         "image": saved_filename,
-        "engine": "PaddleOCR",
+        "engine": "RapidOCR",
         "created_at": created_at_iso,
         "ocr": ocr_regions
     }

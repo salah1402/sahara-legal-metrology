@@ -41,3 +41,5 @@ backend/inspections/*
 Thumbs.db
 *.tmp
 *.log
+edit/
+img/

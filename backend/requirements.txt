@@ -1,6 +1,6 @@
 # ====================================================================
 # SAHARA — Legal Metrology Inspection System
-# Backend Python Dependencies (Compatible with Python 3.10+ / Linux CPU & Render)
+# Backend Python Dependencies (Compatible with Python 3.10+ / Linux CPU & Render Free 512MB)
 # ====================================================================
 
 # Web Framework & ASGI Server
@@ -10,10 +10,9 @@ python-multipart>=0.0.9,<0.1.0
 pydantic>=2.6.0,<3.0.0
 python-dotenv>=1.0.0,<2.0.0
 
-# OCR & Computer Vision Pipeline (CPU Compatible for Render / Linux)
-paddlepaddle==3.3.0
-paddleocr==3.7.0
-paddlex==3.7.2
+# Ultra-Lightweight OCR Engine (<100MB RAM, CPU Optimized for Render Free)
+rapidocr-onnxruntime>=1.4.0,<2.0.0
+onnxruntime>=1.17.0,<2.0.0
 opencv-python-headless>=4.8.0,<5.0.0
 pillow>=10.0.0,<13.0.0
 numpy>=1.24.0,<2.3.0
