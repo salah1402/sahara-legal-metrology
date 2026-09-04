@@ -123,6 +123,17 @@ def get_ocr_engine():
         logger.error(f"Error initializing RapidOCR engine: {e}", exc_info=True)
         raise
 
+
+@app.on_event("startup")
+async def preload_ocr_engine():
+    """Pre-warms RapidOCR in a worker thread so first request does not suffer cold start delays."""
+    try:
+        logger.info("Pre-warming RapidOCR ONNX engine in background thread...")
+        await asyncio.to_thread(get_ocr_engine)
+        logger.info("RapidOCR ONNX engine pre-warm completed successfully.")
+    except Exception as prewarm_err:
+        logger.warning(f"RapidOCR pre-warm skipped or delayed: {prewarm_err}")
+
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
@@ -381,7 +392,7 @@ async def process_ocr(
             scale_x, scale_y = 1.0, 1.0
 
         try:
-            engine = get_ocr_engine()
+            engine = await asyncio.to_thread(get_ocr_engine)
             logger.info(f"Running RapidOCR on {ocr_input_path} (Inspection: {inspection_id})...")
             result, elapse_list = await asyncio.to_thread(engine, str(ocr_input_path))
 
