@@ -29,6 +29,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from PIL import Image, ImageOps
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sahara_backend")
@@ -365,7 +366,7 @@ async def process_ocr(
         
         # Preprocess image: scale down to max 1280px to protect memory buffers
         scale_x, scale_y = 1.0, 1.0
-        ocr_input_path = saved_image_path
+        ocr_input: Any = str(saved_image_path)
         temp_proc_path: Optional[Path] = None
 
         try:
@@ -379,22 +380,21 @@ async def process_ocr(
                     resized = pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
                     scale_x = orig_w / new_w
                     scale_y = orig_h / new_h
-                    temp_proc_path = images_folder / f"proc_{saved_filename}.jpg"
-                    resized.convert("RGB").save(temp_proc_path, "JPEG", quality=85)
-                    ocr_input_path = temp_proc_path
+                    ocr_input = np.array(resized.convert("RGB"))[:, :, ::-1]
                     del resized
                     logger.info(f"Downscaled image for OCR from {orig_w}x{orig_h} to {new_w}x{new_h} (Scale: {scale_x:.2f}, {scale_y:.2f})")
                 else:
                     scale_x, scale_y = 1.0, 1.0
+                    ocr_input = np.array(pil_img.convert("RGB"))[:, :, ::-1]
         except Exception as img_err:
-            logger.warning(f"Could not resize image for OCR: {img_err}. Using original image.")
-            ocr_input_path = saved_image_path
+            logger.warning(f"Could not load image as numpy for OCR: {img_err}. Using file path.")
+            ocr_input = str(saved_image_path)
             scale_x, scale_y = 1.0, 1.0
 
         try:
             engine = await asyncio.to_thread(get_ocr_engine)
-            logger.info(f"Running RapidOCR on {ocr_input_path} (Inspection: {inspection_id})...")
-            result, elapse_list = await asyncio.to_thread(engine, str(ocr_input_path))
+            logger.info(f"Running RapidOCR on image input (Inspection: {inspection_id})...")
+            result, elapse_list = await asyncio.to_thread(engine, ocr_input)
 
             ocr_regions = []
             if result:
