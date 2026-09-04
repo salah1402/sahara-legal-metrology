@@ -2,8 +2,9 @@ import io
 import json
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, timezone
+from PIL import Image as PILImage, ImageOps
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -15,7 +16,8 @@ from reportlab.platypus import (
     TableStyle,
     HRFlowable,
     KeepTogether,
-    PageBreak
+    PageBreak,
+    Image as RLImage
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
@@ -148,9 +150,151 @@ def format_canonical_verdict(overall_status: str) -> str:
     return overall_status.replace("_", " ")
 
 
+def find_inspection_image(
+    insp_folder: Path,
+    explicit_image: Optional[Any] = None
+) -> Optional[Any]:
+    """Resolves image bytes, Path, or BytesIO for the inspection."""
+    if explicit_image is not None:
+        return explicit_image
+
+    images_dir = insp_folder / "images"
+    if not images_dir.exists():
+        return None
+
+    # 1. Check raw_ocr.json for image reference
+    raw_ocr_file = insp_folder / "ocr" / "raw_ocr.json"
+    if raw_ocr_file.exists():
+        try:
+            with open(raw_ocr_file, "r", encoding="utf-8") as f:
+                raw_ocr_data = json.load(f)
+                img_name = raw_ocr_data.get("image")
+                if img_name:
+                    cand = images_dir / img_name
+                    if cand.is_file():
+                        return cand
+        except Exception:
+            pass
+
+    # 2. Check metadata.json
+    meta_file = insp_folder / "metadata.json"
+    if meta_file.exists():
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta_data = json.load(f)
+                orig_name = meta_data.get("original_filename")
+                if orig_name:
+                    cand = images_dir / orig_name
+                    if cand.is_file():
+                        return cand
+        except Exception:
+            pass
+
+    # 3. Check for any valid image in images directory
+    valid_extensions = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+    for candidate in sorted(images_dir.iterdir()):
+        if candidate.is_file() and candidate.suffix.lower() in valid_extensions:
+            if not candidate.name.startswith("proc_"):
+                return candidate
+
+    return None
+
+
+def create_uploaded_image_flowables(image_input: Optional[Any], styles: Any) -> List[Any]:
+    """
+    Creates ReportLab flowables for the 'Uploaded Package Image' section.
+    Keeps original aspect ratio, scales neatly within PDF boundaries, and embeds image.
+    Displays 'Figure 1: Uploaded Package Image' or fallback 'Image not available.'.
+    """
+    flowables = []
+
+    # Section Header
+    flowables.append(Paragraph("Uploaded Package Image", styles['SectionHeader']))
+
+    if not image_input:
+        flowables.append(Paragraph("<font color='#64748B' size='8'>Image not available.</font>", styles['BodySmall']))
+        return flowables
+
+    try:
+        # Load image via PIL
+        if isinstance(image_input, (str, Path)):
+            img_path = Path(image_input)
+            if not img_path.exists():
+                flowables.append(Paragraph("<font color='#64748B' size='8'>Image not available.</font>", styles['BodySmall']))
+                return flowables
+            pil_img = PILImage.open(str(img_path))
+        elif isinstance(image_input, bytes):
+            pil_img = PILImage.open(io.BytesIO(image_input))
+        elif isinstance(image_input, io.BytesIO):
+            image_input.seek(0)
+            pil_img = PILImage.open(image_input)
+        else:
+            flowables.append(Paragraph("<font color='#64748B' size='8'>Image not available.</font>", styles['BodySmall']))
+            return flowables
+
+        # Auto-orient based on EXIF tag
+        pil_img = ImageOps.exif_transpose(pil_img) or pil_img
+        orig_w, orig_h = pil_img.size
+        if orig_w <= 0 or orig_h <= 0:
+            raise ValueError("Invalid image dimensions")
+
+        # Convert to RGB buffer (JPEG format) for universal ReportLab embedding
+        img_buffer = io.BytesIO()
+        if pil_img.mode in ("RGBA", "LA", "P"):
+            rgb_img = pil_img.convert("RGB")
+            rgb_img.save(img_buffer, format="JPEG", quality=88)
+            del rgb_img
+        else:
+            pil_img.save(img_buffer, format="JPEG", quality=88)
+        img_buffer.seek(0)
+
+        # Target constraints (pt) for neat PDF page fit
+        MAX_WIDTH = 300.0  # pt
+        MAX_HEIGHT = 150.0 # pt
+        scale = min(MAX_WIDTH / orig_w, MAX_HEIGHT / orig_h)
+        disp_w = orig_w * scale
+        disp_h = orig_h * scale
+
+        rl_img = RLImage(img_buffer, width=disp_w, height=disp_h)
+        rl_img.hAlign = 'CENTER'
+
+        caption_style = ParagraphStyle(
+            name='PackageImageCaption',
+            parent=styles['BodySmall'],
+            alignment=TA_CENTER,
+            fontSize=7.5,
+            leading=10,
+            textColor=colors.HexColor('#64748B'),
+            spaceBefore=3,
+            spaceAfter=2
+        )
+        caption_para = Paragraph("<i>Figure 1: Uploaded Package Image</i>", caption_style)
+
+        # Centered container table with subtle border
+        card_table = Table([[rl_img], [caption_para]], colWidths=[540])
+        card_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        flowables.append(card_table)
+
+    except Exception as img_err:
+        logger.warning(f"Could not load or embed package image in PDF: {img_err}")
+        flowables.append(Paragraph("<font color='#64748B' size='8'>Image not available.</font>", styles['BodySmall']))
+
+    return flowables
+
+
 def generate_inspection_pdf(
     inspection_id: str,
-    output_path: Optional[Path] = None
+    output_path: Optional[Path] = None,
+    image_data: Optional[Union[str, Path, bytes, io.BytesIO]] = None
 ) -> bytes:
     """
     Generates a clean, professional, 2-page PDF inspection report for the specified inspection ID.
@@ -370,6 +514,11 @@ def generate_inspection_pdf(
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
     ]))
     story.append(findings_box)
+
+    # --- Uploaded Package Image Section ---
+    story.append(Spacer(1, 4))
+    resolved_image = find_inspection_image(insp_folder, image_data)
+    story.extend(create_uploaded_image_flowables(resolved_image, styles))
 
     # =========================================================================
     # PAGE BREAK -> PAGE 2: Full Statutory Audit Table & Traceability

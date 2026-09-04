@@ -299,6 +299,47 @@ class TestInspectionReportGeneration(unittest.TestCase):
         self.assertIsNotNone(pdf_bytes)
         self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
 
+    def test_14_pdf_includes_uploaded_image_embedding(self):
+        """Test PDF generation embeds real uploaded package image."""
+        from PIL import Image as PILImage
+        img_dir = self.test_dir / "images"
+        img_dir.mkdir(parents=True, exist_ok=True)
+        img_path = img_dir / "product.jpg"
+
+        # Create a valid test image
+        img = PILImage.new("RGB", (300, 400), color=(73, 109, 137))
+        img.save(img_path, format="JPEG")
+
+        comp = self.create_mock_compliance_result("COMPLIANT")
+        with open(self.test_dir / "compliance" / "compliance_result.json", "w", encoding="utf-8") as f:
+            json.dump(comp.model_dump(), f)
+
+        pdf_bytes = generate_inspection_pdf(self.test_insp_id)
+        self.assertIsNotNone(pdf_bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+        self.assertGreater(len(pdf_bytes), 5000)
+
+        # Test passing image bytes directly
+        with open(img_path, "rb") as f:
+            raw_img_bytes = f.read()
+        pdf_bytes_direct = generate_inspection_pdf(self.test_insp_id, image_data=raw_img_bytes)
+        self.assertTrue(pdf_bytes_direct.startswith(b"%PDF-"))
+
+    def test_15_pdf_handles_missing_image_gracefully(self):
+        """Test PDF generation succeeds with graceful fallback when image is missing."""
+        comp = self.create_mock_compliance_result("COMPLIANT")
+        with open(self.test_dir / "compliance" / "compliance_result.json", "w", encoding="utf-8") as f:
+            json.dump(comp.model_dump(), f)
+
+        # Ensure no images folder
+        img_dir = self.test_dir / "images"
+        if img_dir.exists():
+            shutil.rmtree(img_dir)
+
+        pdf_bytes = generate_inspection_pdf(self.test_insp_id)
+        self.assertIsNotNone(pdf_bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+
 
 if __name__ == "__main__":
     unittest.main()
