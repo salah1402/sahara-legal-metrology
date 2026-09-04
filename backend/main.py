@@ -15,7 +15,7 @@ _pkg_root = str(Path(__file__).resolve().parent.parent)
 if _pkg_root not in sys.path:
     sys.path.insert(0, _pkg_root)
 
-# Configure low-memory CPU runtime environment flags for Paddle & BLAS
+# Configure low-memory CPU runtime environment flags for RapidOCR / ONNX & BLAS
 os.environ["FLAGS_eager_delete_tensor_gb"] = "0.0"
 os.environ["FLAGS_fast_eager_deletion_mode"] = "1"
 os.environ["FLAGS_allocator_strategy"] = "naive_best_fit"

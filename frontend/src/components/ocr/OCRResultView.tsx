@@ -284,7 +284,7 @@ export const OCRResultView: React.FC<OCRResultViewProps> = ({
             <span className="font-semibold text-slate-800 truncate">Audit & Engine Details</span>
             <span className="text-slate-400 hidden sm:inline">|</span>
             <span className="text-slate-500 hidden md:inline truncate">
-              PaddleOCR GPU → Nemotron 3 Ultra 550B → Deterministic PCR 2011
+              RapidOCR ONNX → Nemotron 3 Ultra 550B → Deterministic PCR 2011
             </span>
           </div>
           <div className="flex items-center gap-1 text-slate-400 flex-shrink-0 ml-2">
@@ -297,7 +297,7 @@ export const OCRResultView: React.FC<OCRResultViewProps> = ({
           <div className="p-3 border-t border-slate-200 bg-white grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
             <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80">
               <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">OCR Layer</span>
-              <div className="font-semibold text-slate-900">PaddleOCR GPU Engine</div>
+              <div className="font-semibold text-slate-900">RapidOCR ONNX Engine</div>
               <div className="text-[11px] text-slate-500 font-mono mt-0.5">{regions.length} text regions extracted</div>
             </div>
 
@@ -497,7 +497,7 @@ export const OCRResultView: React.FC<OCRResultViewProps> = ({
                         <option value="all">Full Record Bundle</option>
                         <option value="compliance">Compliance Report (Phase 3)</option>
                         <option value="normalized">Structured Product JSON (Phase 2)</option>
-                        <option value="raw_ocr">Raw PaddleOCR JSON</option>
+                        <option value="raw_ocr">Raw RapidOCR JSON</option>
                       </select>
                     </div>
 

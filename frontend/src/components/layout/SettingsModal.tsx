@@ -38,7 +38,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Server className="w-3.5 h-3.5 text-primary-800" />
-            <span>PaddleOCR & Rule Engine Backend URL</span>
+            <span>RapidOCR & Rule Engine Backend URL</span>
           </label>
           <input
             type="text"

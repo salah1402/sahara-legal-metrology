@@ -1,7 +1,7 @@
 # MetraCheck Development Server Launcher (Persistent Windows)
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-Write-Host "Starting MetraCheck Backend (FastAPI + PaddleOCR)..." -ForegroundColor Cyan
+Write-Host "Starting MetraCheck Backend (FastAPI + RapidOCR)..." -ForegroundColor Cyan
 Start-Process powershell.exe -ArgumentList "-NoExit", "-Command", "cd '$rootDir'; Write-Host '=== MetraCheck Backend (FastAPI on Port 8000) ===' -ForegroundColor Green; & '.\ocr test\.venv\Scripts\python.exe' -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload"
 
 Write-Host "Starting MetraCheck Frontend (Vite React)..." -ForegroundColor Cyan

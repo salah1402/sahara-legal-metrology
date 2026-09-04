@@ -87,7 +87,7 @@ export const SAMPLE_INSPECTIONS: InspectionRecord[] = [
     ],
     ocrResult: {
       inspection_id: "INSP-2026-0830-001",
-      engine: "PaddleOCR v2.8 (Server Engine)",
+      engine: "RapidOCR ONNX (Server Engine)",
       processing_time_ms: 642,
       images: [
         {
@@ -286,7 +286,7 @@ export const SAMPLE_INSPECTIONS: InspectionRecord[] = [
     ],
     ocrResult: {
       inspection_id: "INSP-2026-0830-002",
-      engine: "PaddleOCR v2.8 (Server Engine)",
+      engine: "RapidOCR ONNX (Server Engine)",
       processing_time_ms: 710,
       images: [
         {

@@ -49,7 +49,7 @@ export const OCRRegionList: React.FC<OCRRegionListProps> = ({
               {regions.length}
             </span>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono">PaddleOCR v2.8</span>
+          <span className="text-[11px] text-slate-400 font-mono">RapidOCR ONNX</span>
         </div>
 
         {/* Search filter input */}

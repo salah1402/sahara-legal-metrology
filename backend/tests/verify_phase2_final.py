@@ -15,7 +15,7 @@ assert r1.status_code == 200, f"OCR failed: {r1.text}"
 ocr_data = r1.json()
 insp_id = ocr_data["inspection_id"]
 regions_len = len(ocr_data["ocr"])
-print(f"1. PaddleOCR Success -> Inspection ID: {insp_id}, Regions: {regions_len}")
+print(f"1. RapidOCR Success -> Inspection ID: {insp_id}, Regions: {regions_len}")
 
 # 2. Nemotron Semantic Normalization
 r2 = requests.post(

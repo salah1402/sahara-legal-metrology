@@ -1,5 +1,5 @@
 /**
- * OCR Data Types for PaddleOCR backend integration
+ * OCR Data Types for RapidOCR backend integration
  * Coordinates format: [x1, y1, x2, y2] (top-left to bottom-right)
  */
 

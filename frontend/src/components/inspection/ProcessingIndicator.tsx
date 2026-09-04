@@ -12,7 +12,7 @@ export interface ProcessingIndicatorProps {
 
 const STAGES = [
   { id: 'preparing_image', label: 'Preparing image', stageIndex: 1 },
-  { id: 'processing_ocr', label: 'OCR processing (PaddleOCR)', stageIndex: 2 },
+  { id: 'processing_ocr', label: 'OCR processing (RapidOCR)', stageIndex: 2 },
   { id: 'understanding_label', label: 'Understanding label (Nemotron)', stageIndex: 3 },
   { id: 'complete', label: 'Structured Data Ready', stageIndex: 4 },
 ];

@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field, model_validator
 
 class OCRRegion(BaseModel):
     id: str = Field(..., description="Unique OCR token ID e.g. ocr_001")
-    text: str = Field(..., description="Raw text extracted by PaddleOCR")
-    confidence: float = Field(..., description="PaddleOCR recognition confidence 0.0 - 1.0")
+    text: str = Field(..., description="Raw text extracted by RapidOCR")
+    confidence: float = Field(..., description="RapidOCR recognition confidence 0.0 - 1.0")
     bbox: List[int] = Field(..., description="Bounding box [x1, y1, x2, y2]")
     image_id: Optional[str] = Field("IMG-001", description="Source image identifier")
 
@@ -17,7 +17,7 @@ class OCRRegion(BaseModel):
 class RawOCRData(BaseModel):
     inspection_id: str
     image: str
-    engine: str = "PaddleOCR"
+    engine: str = "RapidOCR"
     created_at: str
     ocr: List[OCRRegion]
 

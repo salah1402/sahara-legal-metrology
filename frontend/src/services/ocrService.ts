@@ -3,7 +3,7 @@ import type { OCRResponse, BackendOCRResponse } from '../types/ocr';
 import type { StructuredInstruction } from '../types/instruction';
 
 /**
- * Service to interface with PaddleOCR backend
+ * Service to interface with RapidOCR backend
  * Target endpoint: POST http://127.0.0.1:8000/api/ocr (multipart/form-data)
  */
 
@@ -15,7 +15,7 @@ export interface OCRRequestOptions {
 }
 
 /**
- * Process a single image file through the real FastAPI PaddleOCR backend
+ * Process a single image file through the real FastAPI RapidOCR backend
  */
 export async function processOCR(file: File | Blob, inspectionId?: string): Promise<BackendOCRResponse> {
   const config = getApiConfig();
@@ -78,7 +78,7 @@ export async function performOCR(options: OCRRequestOptions): Promise<OCRRespons
   // Normalize into frontend multi-image OCR structure
   return {
     inspection_id: backendResult.inspection_id,
-    engine: backendResult.engine || 'PaddleOCR',
+    engine: backendResult.engine || 'RapidOCR',
     images: [
       {
         image_id: options.imageIds?.[0] || 'img_001',
@@ -103,7 +103,7 @@ export async function getInspectionOCR(inspectionId: string): Promise<OCRRespons
       if (data?.ocr) {
         return {
           inspection_id: data.ocr.inspection_id || inspectionId,
-          engine: data.ocr.engine || 'PaddleOCR',
+          engine: data.ocr.engine || 'RapidOCR',
           images: [
             {
               image_id: 'img_001',

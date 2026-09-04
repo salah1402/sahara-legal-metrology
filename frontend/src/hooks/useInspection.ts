@@ -130,10 +130,10 @@ export function useInspection() {
       const blob = await res.blob();
       const imageFile = new File([blob], targetImage.name, { type: targetImage.type || 'image/jpeg' });
 
-      // Stage 2: Processing OCR with PaddleOCR backend
+      // Stage 2: Processing OCR with RapidOCR backend
       setPipelineStage('processing_ocr');
       setPipelineProgress(50);
-      setPipelineMessage('Running PaddleOCR detection and text recognition on backend GPU...');
+      setPipelineMessage('Running RapidOCR detection and text recognition on backend...');
 
       const ocrData = await processOCR(imageFile);
 
@@ -195,7 +195,7 @@ export function useInspection() {
         images: selectedImages,
         ocrResult: {
           inspection_id: ocrData.inspection_id,
-          engine: ocrData.engine || 'PaddleOCR',
+          engine: ocrData.engine || 'RapidOCR',
           images: [
             {
               image_id: targetImage.id,

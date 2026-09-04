@@ -89,7 +89,7 @@ export async function getInspection(id: string): Promise<InspectionRecord | null
         ],
         ocrResult: data.ocr ? {
           inspection_id: id,
-          engine: data.ocr.engine || 'PaddleOCR',
+          engine: data.ocr.engine || 'RapidOCR',
           images: [
             {
               image_id: 'img_001',
