@@ -114,9 +114,9 @@ def get_ocr_engine():
     if RapidOCR is None:
         raise RuntimeError(f"RapidOCR package is not available: {rapidocr_import_error}")
 
-    logger.info("Initializing lazy singleton RapidOCR engine (PP-OCRv4 ONNX CPU, det_limit=720)...")
+    logger.info("Initializing lazy singleton RapidOCR engine (PP-OCRv4 ONNX CPU, det_limit=640, use_cls=False)...")
     try:
-        _ocr_engine = RapidOCR(det_limit_side_len=720, det_limit_type="max")
+        _ocr_engine = RapidOCR(det_limit_side_len=640, det_limit_type="max", use_cls=False)
         logger.info(f"RapidOCR engine initialized successfully (Process RSS: {get_current_rss_mb():.1f} MB).")
         return _ocr_engine
     except Exception as e:

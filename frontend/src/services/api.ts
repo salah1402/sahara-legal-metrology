@@ -58,7 +58,7 @@ const resolveDefaultApiBase = (): string => {
 
 const DEFAULT_CONFIG: ApiConfig = {
   baseUrl: resolveDefaultApiBase(),
-  timeoutMs: 45000,
+  timeoutMs: 180000,
   useDemoFixtures: false,
 };
 
