@@ -319,3 +319,91 @@ export async function request<T>(
     );
   }
 }
+
+/**
+ * Probes the backend health endpoint before starting an inspection.
+ * If the cloud backend (Render) is sleeping, waking from cold start takes ~25-45 seconds.
+ * 
+ * This function:
+ * 1. Probes the backend /health endpoint.
+ * 2. If healthy, resolves immediately (0ms delay for awake backends).
+ * 3. If unreachable or waking up (502/503/timeout), sets status to "Waking inspection service… Please wait."
+ *    and retries every 3 seconds for up to maxWaitMs (90s max).
+ * 4. As soon as the health check returns 200 OK, resolves so the inspection proceeds automatically
+ *    without the user having to press "Start Inspection" again.
+ * 5. If the backend fails to respond after 90 seconds, throws a descriptive ApiError.
+ */
+export async function ensureBackendAwake(
+  onStatusUpdate?: (message: string) => void,
+  maxWaitMs: number = 90000
+): Promise<void> {
+  const config = getApiConfig();
+  const baseUrl = config.baseUrl.replace(/\/+$/, "");
+  const healthUrl = `${baseUrl}/health`;
+
+  const probeHealth = async (timeoutMs: number): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(healthUrl, {
+        method: "GET",
+        mode: "cors",
+        signal: controller.signal,
+      });
+      window.clearTimeout(timer);
+      return res.ok;
+    } catch {
+      // Fallback: probe root "/" endpoint in case /health is temporarily unavailable
+      try {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), Math.min(timeoutMs, 4000));
+        const resRoot = await fetch(`${baseUrl}/`, {
+          method: "GET",
+          mode: "cors",
+          signal: controller.signal,
+        });
+        window.clearTimeout(timer);
+        return resRoot.ok;
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  // 1. Initial quick probe (4000ms timeout)
+  const isHealthyInitially = await probeHealth(4000);
+  if (isHealthyInitially) {
+    return;
+  }
+
+  // 2. Cold start detected. Start retry wait loop (up to maxWaitMs, ~90 seconds)
+  const startTime = Date.now();
+  onStatusUpdate?.("Waking inspection service… Please wait.");
+
+  let attempt = 0;
+  while (Date.now() - startTime < maxWaitMs) {
+    attempt++;
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    onStatusUpdate?.("Waking inspection service… Please wait.");
+
+    const isHealthy = await probeHealth(6000);
+    if (isHealthy) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`Backend is online after ${elapsed}s (attempt ${attempt}). Resuming inspection...`);
+      return;
+    }
+  }
+
+  // 3. Genuine failure after 90 seconds
+  const isLocal =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1");
+
+  const errorMsg = isLocal
+    ? "Unable to connect to the local development backend. Make sure your local FastAPI service is running on http://127.0.0.1:8000."
+    : `Unable to connect to the SAHARA inspection backend (${baseUrl}) after waiting 90 seconds. The service may be experiencing downtime; please wait a moment and try again.`;
+
+  throw new ApiError(errorMsg, 0, "BACKEND_UNAVAILABLE");
+}

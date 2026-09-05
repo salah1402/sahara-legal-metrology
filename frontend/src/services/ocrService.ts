@@ -18,18 +18,31 @@ export interface OCRRequestOptions {
  * Process a single image file through the real FastAPI RapidOCR backend
  */
 async function pingBackend(baseUrl: string): Promise<boolean> {
+  const cleanBase = baseUrl.replace(/\/+$/, '');
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/`, {
+    const res = await fetch(`${cleanBase}/health`, {
       method: 'GET',
       mode: 'cors',
       signal: controller.signal,
     });
     clearTimeout(timer);
-    return res.ok || res.status < 500;
+    return res.ok;
   } catch {
-    return false;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const resRoot = await fetch(`${cleanBase}/`, {
+        method: 'GET',
+        mode: 'cors',
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return resRoot.ok;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -107,15 +120,15 @@ export async function processOCR(
 
     // If attempt 1 failed due to cold boot or network drop, poll backend until online
     if (attempt === 1) {
-      onProgress?.('Waking up inspection service (cold start)...');
-      console.log('Suspected cloud cold-start. Polling backend root until service is online...');
+      onProgress?.('Waking inspection service… Please wait.');
+      console.log('Suspected cloud cold-start. Polling backend /health until service is online...');
 
       const maxPollCycles = 12; // 12 * 3s = 36s max
       let isOnline = false;
 
       for (let cycle = 1; cycle <= maxPollCycles; cycle++) {
         await new Promise((resolve) => setTimeout(resolve, 3000));
-        onProgress?.(`Waking up inspection service (${cycle * 3}s)...`);
+        onProgress?.('Waking inspection service… Please wait.');
 
         const healthy = await pingBackend(config.baseUrl);
         if (healthy) {

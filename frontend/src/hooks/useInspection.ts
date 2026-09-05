@@ -10,6 +10,7 @@ import { evaluateCompliance } from '../services/complianceService';
 import * as inspectionService from '../services/inspectionService';
 import { formatProductCompositeTitle } from '../utils/formatters';
 import { optimizeImageForUpload } from '../utils/imageOptimizer';
+import { ensureBackendAwake } from '../services/api';
 import { showToast } from './useToast';
 
 export function useInspection() {
@@ -121,9 +122,17 @@ export function useInspection() {
     setError(null);
 
     try {
-      // Stage 1: Preparing image
+      // Stage 1: Detect backend availability & wake-up from cold start if needed
       setPipelineStage('preparing_image');
-      setPipelineProgress(25);
+      setPipelineProgress(15);
+      setPipelineMessage('Waking inspection service… Please wait.');
+
+      // Automatically detect and wait for Render cold-start if sleeping
+      await ensureBackendAwake((statusMsg) => {
+        setPipelineMessage(statusMsg);
+      });
+
+      setPipelineProgress(30);
       setPipelineMessage('Preparing image buffer for upload...');
 
       const targetImage = selectedImages[0];
