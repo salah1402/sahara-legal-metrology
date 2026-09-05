@@ -55,20 +55,20 @@ export async function processOCR(
   onProgress?: (statusMessage: string) => void
 ): Promise<BackendOCRResponse> {
   const config = getApiConfig();
-  const formData = new FormData();
-
-  const filename = file instanceof File ? file.name : `label_capture_${Date.now()}.jpg`;
-  formData.append('file', file, filename);
-
-  if (inspectionId) {
-    formData.append('inspection_id_param', inspectionId);
-  }
-
   const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/api/ocr`;
 
-  // Allow a primary attempt. If a cold-start response (502/503) or connection drop occurs,
-  // we poll GET / until Render wakes up (up to 36 seconds), then retry the request.
-  const maxAttempts = 2;
+  const buildFormData = () => {
+    const formData = new FormData();
+    const filename = file instanceof File ? file.name : `label_capture_${Date.now()}.jpg`;
+    formData.append('file', file, filename);
+    if (inspectionId) {
+      formData.append('inspection_id_param', inspectionId);
+    }
+    return formData;
+  };
+
+  // Allow up to 3 attempts with fresh FormData on each attempt
+  const maxAttempts = 3;
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -78,7 +78,7 @@ export async function processOCR(
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
-        body: formData,
+        body: buildFormData(),
         signal: controller.signal,
       });
 
@@ -87,7 +87,7 @@ export async function processOCR(
       // If backend returns 502/503 (Render cold boot gateway status)
       if ((response.status === 502 || response.status === 503) && attempt < maxAttempts) {
         console.warn(`Backend returned HTTP ${response.status} during boot. Starting cold-start wake-up wait...`);
-        lastError = new Error(`HTTP ${response.status} Bad Gateway during cold start`);
+        lastError = new Error(`HTTP ${response.status} Service Unavailable during boot`);
       } else if (!response.ok) {
         // Real HTTP errors from the backend application (400, 422, 413, 500, etc.)
         let errDetail = response.statusText;
@@ -118,12 +118,12 @@ export async function processOCR(
       console.warn(`Attempt ${attempt} failed with network/cold-start error:`, err?.message || err);
     }
 
-    // If attempt 1 failed due to cold boot or network drop, poll backend until online
-    if (attempt === 1) {
+    // If attempt failed due to cold boot or network drop, poll backend until online
+    if (attempt < maxAttempts) {
       onProgress?.('Waking inspection service… Please wait.');
       console.log('Suspected cloud cold-start. Polling backend /health until service is online...');
 
-      const maxPollCycles = 12; // 12 * 3s = 36s max
+      const maxPollCycles = 15; // 15 * 3s = 45s max
       let isOnline = false;
 
       for (let cycle = 1; cycle <= maxPollCycles; cycle++) {
@@ -140,7 +140,7 @@ export async function processOCR(
       }
 
       if (!isOnline) {
-        console.warn('Backend wake-up polling reached timeout (36s). Attempting final submission...');
+        console.warn('Backend wake-up polling reached timeout (45s). Attempting final submission...');
       }
     }
   }

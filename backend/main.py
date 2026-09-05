@@ -364,7 +364,7 @@ async def process_ocr(
         rss_start = get_current_rss_mb()
         logger.info(f"Acquired OCR lock for {inspection_id} (Process RSS: {rss_start:.1f} MB)...")
         
-        # Preprocess image: scale down to max 1280px to protect memory buffers
+        # Preprocess image: scale down to max 720px to protect memory buffers and accelerate inference
         scale_x, scale_y = 1.0, 1.0
         ocr_input: Any = str(saved_image_path)
         temp_proc_path: Optional[Path] = None
@@ -373,11 +373,11 @@ async def process_ocr(
             with Image.open(saved_image_path) as pil_img:
                 pil_img = ImageOps.exif_transpose(pil_img) or pil_img
                 orig_w, orig_h = pil_img.size
-                MAX_OCR_DIM = 1280
+                MAX_OCR_DIM = 720
                 if max(orig_w, orig_h) > MAX_OCR_DIM:
                     scale = MAX_OCR_DIM / max(orig_w, orig_h)
                     new_w, new_h = max(1, int(orig_w * scale)), max(1, int(orig_h * scale))
-                    resized = pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                    resized = pil_img.resize((new_w, new_h), Image.Resampling.BILINEAR)
                     scale_x = orig_w / new_w
                     scale_y = orig_h / new_h
                     ocr_input = np.array(resized.convert("RGB"))[:, :, ::-1]
@@ -449,7 +449,14 @@ async def process_ocr(
                     temp_proc_path.unlink()
                 except Exception:
                     pass
+            ocr_input = None
             gc.collect()
+            try:
+                import ctypes
+                libc = ctypes.CDLL("libc.so.6")
+                libc.malloc_trim(0)
+            except Exception:
+                pass
             rss_end = get_current_rss_mb()
             logger.info(f"Released OCR inference resources for {inspection_id}. Process RSS: {rss_end:.1f} MB (Delta: {rss_end - rss_start:+.1f} MB).")
 
