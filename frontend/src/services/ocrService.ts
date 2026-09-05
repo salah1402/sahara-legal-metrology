@@ -17,7 +17,30 @@ export interface OCRRequestOptions {
 /**
  * Process a single image file through the real FastAPI RapidOCR backend
  */
-export async function processOCR(file: File | Blob, inspectionId?: string): Promise<BackendOCRResponse> {
+async function pingBackend(baseUrl: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/`, {
+      method: 'GET',
+      mode: 'cors',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return res.ok || res.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Process a single image file through the real FastAPI RapidOCR backend
+ */
+export async function processOCR(
+  file: File | Blob,
+  inspectionId?: string,
+  onProgress?: (statusMessage: string) => void
+): Promise<BackendOCRResponse> {
   const config = getApiConfig();
   const formData = new FormData();
 
@@ -30,34 +53,30 @@ export async function processOCR(file: File | Blob, inspectionId?: string): Prom
 
   const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/api/ocr`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs || 180000);
-
-  // Allow up to 2 attempts in case the cloud backend (Render) is cold-starting (502/503)
+  // Allow a primary attempt. If a cold-start response (502/503) or connection drop occurs,
+  // we poll GET / until Render wakes up (up to 36 seconds), then retry the request.
   const maxAttempts = 2;
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      if (attempt > 1) {
-        // Wait 3s before retrying cold start
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-      }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs || 180000);
 
+    try {
       const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
-        // IMPORTANT: Do NOT manually set Content-Type header so browser sets multipart boundary automatically
       });
 
-      // If backend returns 502/503 during cold boot, retry once
-      if ((response.status === 502 || response.status === 503) && attempt < maxAttempts) {
-        console.warn(`Backend returned HTTP ${response.status} during boot. Retrying OCR request...`);
-        continue;
-      }
+      clearTimeout(timeoutId);
 
-      if (!response.ok) {
+      // If backend returns 502/503 (Render cold boot gateway status)
+      if ((response.status === 502 || response.status === 503) && attempt < maxAttempts) {
+        console.warn(`Backend returned HTTP ${response.status} during boot. Starting cold-start wake-up wait...`);
+        lastError = new Error(`HTTP ${response.status} Bad Gateway during cold start`);
+      } else if (!response.ok) {
+        // Real HTTP errors from the backend application (400, 422, 413, 500, etc.)
         let errDetail = response.statusText;
         try {
           const errJson = await response.json();
@@ -70,24 +89,48 @@ export async function processOCR(file: File | Blob, inspectionId?: string): Prom
           response.status,
           'OCR_HTTP_ERROR'
         );
+      } else {
+        const data: BackendOCRResponse = await response.json();
+        return data;
       }
-
-      const data: BackendOCRResponse = await response.json();
-      clearTimeout(timeoutId);
-      return data;
     } catch (err: any) {
+      clearTimeout(timeoutId);
       lastError = err;
+
+      // Do not catch or retry real application ApiErrors (400, 422, etc.)
       if (err instanceof ApiError) {
-        clearTimeout(timeoutId);
         throw err;
       }
-      if (attempt >= maxAttempts) {
-        break;
+
+      console.warn(`Attempt ${attempt} failed with network/cold-start error:`, err?.message || err);
+    }
+
+    // If attempt 1 failed due to cold boot or network drop, poll backend until online
+    if (attempt === 1) {
+      onProgress?.('Waking up inspection service (cold start)...');
+      console.log('Suspected cloud cold-start. Polling backend root until service is online...');
+
+      const maxPollCycles = 12; // 12 * 3s = 36s max
+      let isOnline = false;
+
+      for (let cycle = 1; cycle <= maxPollCycles; cycle++) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        onProgress?.(`Waking up inspection service (${cycle * 3}s)...`);
+
+        const healthy = await pingBackend(config.baseUrl);
+        if (healthy) {
+          console.log(`Backend is online after ${cycle * 3}s. Retrying OCR request...`);
+          onProgress?.('Inspection service online! Running RapidOCR detection...');
+          isOnline = true;
+          break;
+        }
+      }
+
+      if (!isOnline) {
+        console.warn('Backend wake-up polling reached timeout (36s). Attempting final submission...');
       }
     }
   }
-
-  clearTimeout(timeoutId);
 
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const errorMsg = isLocal

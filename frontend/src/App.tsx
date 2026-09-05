@@ -10,6 +10,7 @@ import { ToastContainer } from './components/common/ToastContainer';
 import { useAuth } from './hooks/useAuth';
 import { useHistory } from './hooks/useHistory';
 import { useInspection } from './hooks/useInspection';
+import { getApiConfig } from './services/api';
 
 export function App() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -63,6 +64,20 @@ export function App() {
       reloadHistory();
     }
   }, [pipelineStage, reloadHistory]);
+
+  // Pre-warm backend container silently on load to minimize cold-start delay
+  useEffect(() => {
+    try {
+      const config = getApiConfig();
+      if (config?.baseUrl) {
+        fetch(`${config.baseUrl.replace(/\/+$/, '')}/`, { mode: 'cors' }).catch(() => {
+          // Silent non-blocking pre-warm
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handlePhotoCaptured = (file: File) => {
     addImages([file]);

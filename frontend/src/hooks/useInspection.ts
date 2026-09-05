@@ -9,6 +9,7 @@ import { normalizeOCR } from '../services/normalizeService';
 import { evaluateCompliance } from '../services/complianceService';
 import * as inspectionService from '../services/inspectionService';
 import { formatProductCompositeTitle } from '../utils/formatters';
+import { optimizeImageForUpload } from '../utils/imageOptimizer';
 import { showToast } from './useToast';
 
 export function useInspection() {
@@ -128,14 +129,19 @@ export function useInspection() {
       const targetImage = selectedImages[0];
       const res = await fetch(targetImage.previewUrl);
       const blob = await res.blob();
-      const imageFile = new File([blob], targetImage.name, { type: targetImage.type || 'image/jpeg' });
+      const rawImageFile = new File([blob], targetImage.name, { type: targetImage.type || 'image/jpeg' });
+
+      // Optimize oversized camera images to prevent mobile cellular timeouts
+      const imageFile = await optimizeImageForUpload(rawImageFile);
 
       // Stage 2: Processing OCR with RapidOCR backend
       setPipelineStage('processing_ocr');
       setPipelineProgress(50);
       setPipelineMessage('Running RapidOCR detection and text recognition on backend...');
 
-      const ocrData = await processOCR(imageFile);
+      const ocrData = await processOCR(imageFile, undefined, (statusMsg) => {
+        setPipelineMessage(statusMsg);
+      });
 
       // Stage 3: NVIDIA Nemotron Semantic Normalization
       setPipelineStage('understanding_label');
