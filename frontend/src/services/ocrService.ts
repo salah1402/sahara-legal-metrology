@@ -4,7 +4,7 @@ import type { StructuredInstruction } from '../types/instruction';
 
 /**
  * Service to interface with RapidOCR backend
- * Target endpoint: POST http://127.0.0.1:8000/api/ocr (multipart/form-data)
+ * Target endpoint: POST /api/ocr (multipart/form-data)
  */
 
 export interface OCRRequestOptions {
@@ -30,38 +30,71 @@ export async function processOCR(file: File | Blob, inspectionId?: string): Prom
 
   const endpoint = `${config.baseUrl.replace(/\/+$/, '')}/api/ocr`;
 
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      body: formData,
-      // IMPORTANT: Do NOT manually set Content-Type header so browser sets multipart boundary automatically
-    });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs || 180000);
 
-    if (!response.ok) {
-      let errDetail = response.statusText;
-      try {
-        const errJson = await response.json();
-        if (errJson?.detail) errDetail = errJson.detail;
-      } catch {
-        // ignore
+  // Allow up to 2 attempts in case the cloud backend (Render) is cold-starting (502/503)
+  const maxAttempts = 2;
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      if (attempt > 1) {
+        // Wait 3s before retrying cold start
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
-      throw new ApiError(
-        errDetail || `OCR request failed with status ${response.status}`,
-        response.status,
-        'OCR_HTTP_ERROR'
-      );
-    }
 
-    const data: BackendOCRResponse = await response.json();
-    return data;
-  } catch (err: any) {
-    if (err instanceof ApiError) throw err;
-    throw new ApiError(
-      'Unable to connect to the OCR backend. Make sure the FastAPI service is running on http://127.0.0.1:8000.',
-      0,
-      'BACKEND_UNAVAILABLE'
-    );
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+        // IMPORTANT: Do NOT manually set Content-Type header so browser sets multipart boundary automatically
+      });
+
+      // If backend returns 502/503 during cold boot, retry once
+      if ((response.status === 502 || response.status === 503) && attempt < maxAttempts) {
+        console.warn(`Backend returned HTTP ${response.status} during boot. Retrying OCR request...`);
+        continue;
+      }
+
+      if (!response.ok) {
+        let errDetail = response.statusText;
+        try {
+          const errJson = await response.json();
+          if (errJson?.detail) errDetail = errJson.detail;
+        } catch {
+          // ignore
+        }
+        throw new ApiError(
+          errDetail || `OCR request failed with status ${response.status}`,
+          response.status,
+          'OCR_HTTP_ERROR'
+        );
+      }
+
+      const data: BackendOCRResponse = await response.json();
+      clearTimeout(timeoutId);
+      return data;
+    } catch (err: any) {
+      lastError = err;
+      if (err instanceof ApiError) {
+        clearTimeout(timeoutId);
+        throw err;
+      }
+      if (attempt >= maxAttempts) {
+        break;
+      }
+    }
   }
+
+  clearTimeout(timeoutId);
+
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const errorMsg = isLocal
+    ? 'Unable to connect to the local development OCR backend. Make sure your local FastAPI service is running.'
+    : `Unable to connect to the SAHARA inspection backend (${config.baseUrl}). The service may be waking up from cold start; please wait a moment and try again.`;
+
+  throw new ApiError(errorMsg, 0, 'BACKEND_UNAVAILABLE', lastError);
 }
 
 /**

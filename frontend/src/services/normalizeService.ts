@@ -4,7 +4,7 @@ import type { OCRTextRegion } from '../types/ocr';
 
 /**
  * Service to interface with NVIDIA Nemotron Semantic Normalization endpoint
- * Target endpoint: POST http://127.0.0.1:8000/api/normalize
+ * Target endpoint: POST /api/normalize
  */
 export async function normalizeOCR(
   inspectionId: string,
@@ -48,8 +48,12 @@ export async function normalizeOCR(
     return data;
   } catch (err: any) {
     if (err instanceof ApiError) throw err;
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const msg = isLocal
+      ? 'Unable to connect to local development Normalization service. Make sure your local backend is running.'
+      : `Unable to connect to Normalization backend service (${config.baseUrl}).`;
     throw new ApiError(
-      'Unable to connect to Normalization backend service.',
+      msg,
       0,
       'BACKEND_UNAVAILABLE'
     );

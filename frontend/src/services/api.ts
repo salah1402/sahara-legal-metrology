@@ -28,31 +28,38 @@ export interface ApiConfig {
  * The API routes themselves contain /api/...
  */
 const resolveDefaultApiBase = (): string => {
-  const envBaseUrl =
-    import.meta.env.VITE_API_BASE_URL ||
-    import.meta.env.VITE_API_URL;
+  // If running in browser, dynamically check hostname
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    // Localhost development
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      const devUrl =
+        import.meta.env.VITE_DEV_API_URL ||
+        (import.meta.env.VITE_API_URL && (import.meta.env.VITE_API_URL.includes("localhost") || import.meta.env.VITE_API_URL.includes("127.0.0.1")) ? import.meta.env.VITE_API_URL : null);
+      if (devUrl) {
+        return String(devUrl).replace(/\/+$/, "");
+      }
+      return "http://127.0.0.1:8000";
+    }
 
-  if (envBaseUrl) {
-    return String(envBaseUrl).replace(/\/+$/, "");
+    // Production host (e.g. saharalegalmetrology.vercel.app or any external domain)
+    // NEVER point to localhost under any circumstances
+    const envBaseUrl =
+      import.meta.env.VITE_API_BASE_URL ||
+      import.meta.env.VITE_API_URL;
+
+    if (envBaseUrl && !envBaseUrl.includes("localhost") && !envBaseUrl.includes("127.0.0.1")) {
+      return String(envBaseUrl).replace(/\/+$/, "");
+    }
+
+    return "https://sahara-legal-metrology-ze1m.onrender.com";
   }
 
-  /**
-   * Local development fallback.
-   *
-   * This is only used when no Vite API environment variable
-   * has been configured.
-   */
+  // SSR or build-time fallback
   if (import.meta.env.DEV) {
     return "http://127.0.0.1:8000";
   }
 
-  /**
-   * Production fallback.
-   *
-   * Normally VITE_API_URL should always be configured on Vercel.
-   * This fallback prevents the application from silently pointing
-   * to localhost in production.
-   */
   return "https://sahara-legal-metrology-ze1m.onrender.com";
 };
 

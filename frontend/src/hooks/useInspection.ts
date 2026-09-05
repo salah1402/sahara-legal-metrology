@@ -214,7 +214,11 @@ export function useInspection() {
     } catch (err: any) {
       console.error('Inspection failed:', err);
       setPipelineStage('error');
-      const errorMsg = err.message || 'Unable to connect to the backend service. Make sure the FastAPI server is running on http://127.0.0.1:8000.';
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const fallbackMsg = isLocal
+        ? 'Unable to connect to the local development backend. Make sure your local FastAPI server is running.'
+        : 'Unable to connect to the SAHARA inspection backend. The cloud service may be waking up from sleep; please try again in a few seconds.';
+      const errorMsg = err.message || fallbackMsg;
       setError(errorMsg);
       showToast('error', 'Normalization Pipeline Failed', errorMsg);
     }
