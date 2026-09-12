@@ -133,7 +133,7 @@ export async function processOCR(
         const healthy = await pingBackend(config.baseUrl);
         if (healthy) {
           console.log(`Backend is online after ${cycle * 3}s. Retrying OCR request...`);
-          onProgress?.('Inspection service online! Running RapidOCR detection...');
+          onProgress?.('Inspection service online! Running OCR detection...');
           isOnline = true;
           break;
         }
@@ -167,7 +167,7 @@ export async function performOCR(options: OCRRequestOptions): Promise<OCRRespons
   // Normalize into frontend multi-image OCR structure
   return {
     inspection_id: backendResult.inspection_id,
-    engine: backendResult.engine || 'RapidOCR',
+    engine: backendResult.engine || 'NVIDIA Nemotron OCR v2',
     images: [
       {
         image_id: options.imageIds?.[0] || 'img_001',
@@ -192,7 +192,7 @@ export async function getInspectionOCR(inspectionId: string): Promise<OCRRespons
       if (data?.ocr) {
         return {
           inspection_id: data.ocr.inspection_id || inspectionId,
-          engine: data.ocr.engine || 'RapidOCR',
+          engine: data.ocr.engine || 'NVIDIA Nemotron OCR v2',
           images: [
             {
               image_id: 'img_001',

@@ -66,6 +66,7 @@ from backend.models.schemas import (
     StructuredProductData,
 )
 from backend.models.compliance import ComplianceResult
+from backend.services.ocr_service import run_ocr_pipeline, get_rapidocr_engine
 from backend.services.nemotron_service import normalize_ocr_with_nemotron
 from backend.services.compliance_service import run_compliance_evaluation
 from backend.services.report_service import generate_inspection_pdf
@@ -100,40 +101,10 @@ app.add_middleware(
 # Mount inspections directory for static image retrieval
 app.mount("/static/inspections", StaticFiles(directory=str(INSPECTIONS_DIR)), name="inspections")
 
-# Lazy Singleton RapidOCR Engine (<100MB RAM, CPU Optimized)
-_ocr_engine = None
-_ocr_init_error: Optional[str] = None
-ocr_lock = asyncio.Lock()
-
-
+# RapidOCR engine helper (kept as lazy fallback without startup pre-warming)
 def get_ocr_engine():
-    """Lazily initializes and returns the shared singleton RapidOCR engine."""
-    global _ocr_engine, _ocr_init_error
-    if _ocr_engine is not None:
-        return _ocr_engine
-    if RapidOCR is None:
-        raise RuntimeError(f"RapidOCR package is not available: {rapidocr_import_error}")
-
-    logger.info("Initializing lazy singleton RapidOCR engine (PP-OCRv4 ONNX CPU, det_limit=640, use_cls=False)...")
-    try:
-        _ocr_engine = RapidOCR(det_limit_side_len=640, det_limit_type="max", use_cls=False)
-        logger.info(f"RapidOCR engine initialized successfully (Process RSS: {get_current_rss_mb():.1f} MB).")
-        return _ocr_engine
-    except Exception as e:
-        _ocr_init_error = str(e)
-        logger.error(f"Error initializing RapidOCR engine: {e}", exc_info=True)
-        raise
-
-
-@app.on_event("startup")
-async def preload_ocr_engine():
-    """Pre-warms RapidOCR in a worker thread so first request does not suffer cold start delays."""
-    try:
-        logger.info("Pre-warming RapidOCR ONNX engine in background thread...")
-        await asyncio.to_thread(get_ocr_engine)
-        logger.info("RapidOCR ONNX engine pre-warm completed successfully.")
-    except Exception as prewarm_err:
-        logger.warning(f"RapidOCR pre-warm skipped or delayed: {prewarm_err}")
+    """Lazily returns the RapidOCR fallback engine without loading weights on boot."""
+    return get_rapidocr_engine()
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -260,10 +231,11 @@ def read_root():
         "product": "SAHARA",
         "subtitle": "Legal Metrology Inspection System",
         "service": "SAHARA OCR, Nemotron Normalization & Legal Compliance Backend",
-        "engine": "RapidOCR (PP-OCRv4 ONNX) + NVIDIA Nemotron 3 Ultra 550B + PCR 2011 Compliance Evaluator",
+        "engine": "NVIDIA Nemotron OCR v2 (Hosted API) + NVIDIA Nemotron 3 Ultra 550B + PCR 2011 Compliance Evaluator",
+        "ocr_provider": "nemotron",
+        "ocr_primary": "NVIDIA Nemotron OCR v2 (Hosted API)",
+        "ocr_fallback": "RapidOCR (PP-OCRv4 ONNX)",
         "ocr_version": rapidocr_version,
-        "ocr_initialized": _ocr_engine is not None,
-        "ocr_error": rapidocr_import_error or _ocr_init_error,
         "phases": ["Phase 1 (Frontend)", "Phase 2 (OCR & Nemotron)", "Phase 3 (Legal Metrology Compliance Engine)", "Phase 4 (Summary & PDF)", "Phase 5 (Workstation & Mobile)"]
     }
 
@@ -273,10 +245,10 @@ def read_root():
 def health_check():
     return {
         "status": "healthy",
-        "ocr_engine_available": RapidOCR is not None,
-        "ocr_engine_loaded": _ocr_engine is not None,
+        "ocr_provider": "nemotron",
+        "ocr_primary": "NVIDIA Nemotron OCR v2 (Hosted API)",
+        "ocr_fallback_available": RapidOCR is not None,
         "ocr_version": rapidocr_version,
-        "ocr_error": rapidocr_import_error or _ocr_init_error,
         "process_rss_mb": round(get_current_rss_mb(), 1),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
@@ -297,15 +269,10 @@ async def process_ocr(
     """
     POST /api/ocr
     Accepts an uploaded image file via multipart/form-data.
-    Performs RapidOCR (PP-OCRv4 ONNX) detection and text recognition with low-memory CPU safeguards.
+    Executes primary NVIDIA Nemotron OCR v2 hosted API with lazy local RapidOCR fallback.
     Saves raw OCR evidence into `ocr/raw_ocr.json`.
     Returns raw OCR JSON.
     """
-    if RapidOCR is None:
-        err_detail = f"OCR engine package is unavailable on the server ({rapidocr_import_error})."
-        logger.error(err_detail)
-        raise HTTPException(status_code=500, detail=err_detail)
-
     target_file = file or image
     if not target_file and images and len(images) > 0:
         target_file = images[0]
@@ -357,114 +324,24 @@ async def process_ocr(
         logger.error(f"Failed to save uploaded image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {str(e)}")
 
-    # Execute RapidOCR inference with memory protection and concurrency serialization
+    # Execute OCR pipeline (Primary: Hosted NVIDIA Nemotron OCR v2 API; Fallback: Local RapidOCR)
     created_at_iso = datetime.now(timezone.utc).isoformat()
-    
-    async with ocr_lock:
-        rss_start = get_current_rss_mb()
-        logger.info(f"Acquired OCR lock for {inspection_id} (Process RSS: {rss_start:.1f} MB)...")
-        
-        # Preprocess image: scale down to max 720px to protect memory buffers and accelerate inference
-        scale_x, scale_y = 1.0, 1.0
-        ocr_input: Any = str(saved_image_path)
-        temp_proc_path: Optional[Path] = None
+    logger.info(f"Running OCR pipeline for {inspection_id} on {saved_image_path.name}...")
 
-        try:
-            with Image.open(saved_image_path) as pil_img:
-                pil_img = ImageOps.exif_transpose(pil_img) or pil_img
-                orig_w, orig_h = pil_img.size
-                MAX_OCR_DIM = 720
-                if max(orig_w, orig_h) > MAX_OCR_DIM:
-                    scale = MAX_OCR_DIM / max(orig_w, orig_h)
-                    new_w, new_h = max(1, int(orig_w * scale)), max(1, int(orig_h * scale))
-                    resized = pil_img.resize((new_w, new_h), Image.Resampling.BILINEAR)
-                    scale_x = orig_w / new_w
-                    scale_y = orig_h / new_h
-                    ocr_input = np.array(resized.convert("RGB"))[:, :, ::-1]
-                    del resized
-                    logger.info(f"Downscaled image for OCR from {orig_w}x{orig_h} to {new_w}x{new_h} (Scale: {scale_x:.2f}, {scale_y:.2f})")
-                else:
-                    scale_x, scale_y = 1.0, 1.0
-                    ocr_input = np.array(pil_img.convert("RGB"))[:, :, ::-1]
-        except Exception as img_err:
-            logger.warning(f"Could not load image as numpy for OCR: {img_err}. Using file path.")
-            ocr_input = str(saved_image_path)
-            scale_x, scale_y = 1.0, 1.0
-
-        try:
-            engine = await asyncio.to_thread(get_ocr_engine)
-            logger.info(f"Running RapidOCR on image input (Inspection: {inspection_id})...")
-            result, elapse_list = await asyncio.to_thread(engine, ocr_input)
-
-            ocr_regions = []
-            if result:
-                for idx, item in enumerate(result):
-                    try:
-                        # item format: [box_points, text, score]
-                        pts = item[0]
-                        txt = str(item[1]).strip()
-                        score = float(item[2])
-                        xs = [p[0] for p in pts]
-                        ys = [p[1] for p in pts]
-                        raw_bbox = [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
-                        bbox_coords = [
-                            int(raw_bbox[0] * scale_x),
-                            int(raw_bbox[1] * scale_y),
-                            int(raw_bbox[2] * scale_x),
-                            int(raw_bbox[3] * scale_y)
-                        ]
-                    except Exception:
-                        bbox_coords = [0, 0, 100, 50]
-                        txt = str(item[1]) if len(item) > 1 else ""
-                        score = float(item[2]) if len(item) > 2 else 0.8
-
-                    ocr_regions.append({
-                        "id": f"ocr_{idx + 1:03d}",
-                        "text": txt,
-                        "confidence": round(score, 4),
-                        "bbox": bbox_coords,
-                        "image_id": "IMG-001"
-                    })
-
-                del result
-
-            logger.info(f"RapidOCR detected {len(ocr_regions)} text regions.")
-
-        except (MemoryError, RuntimeError) as oom_err:
-            logger.error(f"OCR memory/runtime constraint error: {oom_err}", exc_info=True)
-            gc.collect()
-            raise HTTPException(
-                status_code=503,
-                detail="The OCR engine encountered a memory constraint processing this image. Please try a smaller or pre-cropped image."
-            )
-        except Exception as e:
-            logger.error(f"RapidOCR inference failed: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=500,
-                detail=f"OCR engine failed during image processing: {str(e)}"
-            )
-        finally:
-            if temp_proc_path and temp_proc_path.exists():
-                try:
-                    temp_proc_path.unlink()
-                except Exception:
-                    pass
-            ocr_input = None
-            gc.collect()
-            try:
-                import ctypes
-                libc = ctypes.CDLL("libc.so.6")
-                libc.malloc_trim(0)
-            except Exception:
-                pass
-            rss_end = get_current_rss_mb()
-            logger.info(f"Released OCR inference resources for {inspection_id}. Process RSS: {rss_end:.1f} MB (Delta: {rss_end - rss_start:+.1f} MB).")
+    try:
+        ocr_regions, ocr_engine_used = await run_ocr_pipeline(saved_image_path)
+    except Exception as e:
+        logger.error(f"OCR processing failed for {inspection_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"OCR engine failed during image processing: {str(e)}"
+        )
 
     # Build raw OCR response
     raw_ocr_response = {
         "inspection_id": inspection_id,
         "image": saved_filename,
-        "engine": "RapidOCR",
+        "engine": ocr_engine_used,
         "created_at": created_at_iso,
         "ocr": ocr_regions
     }

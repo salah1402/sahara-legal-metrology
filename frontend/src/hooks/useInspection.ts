@@ -143,10 +143,10 @@ export function useInspection() {
       // Optimize oversized camera images to prevent mobile cellular timeouts
       const imageFile = await optimizeImageForUpload(rawImageFile);
 
-      // Stage 2: Processing OCR with RapidOCR backend
+      // Stage 2: Processing OCR with NVIDIA Nemotron OCR backend
       setPipelineStage('processing_ocr');
       setPipelineProgress(50);
-      setPipelineMessage('Running RapidOCR detection and text recognition on backend...');
+      setPipelineMessage('Running NVIDIA Nemotron OCR detection and text recognition on backend...');
 
       const ocrData = await processOCR(imageFile, undefined, (statusMsg) => {
         setPipelineMessage(statusMsg);
@@ -210,7 +210,7 @@ export function useInspection() {
         images: selectedImages,
         ocrResult: {
           inspection_id: ocrData.inspection_id,
-          engine: ocrData.engine || 'RapidOCR',
+          engine: ocrData.engine || 'NVIDIA Nemotron OCR v2',
           images: [
             {
               image_id: targetImage.id,

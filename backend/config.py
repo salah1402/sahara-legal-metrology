@@ -14,3 +14,7 @@ else:
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "").strip()
 NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").strip()
 NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b").strip()
+
+# NVIDIA Nemotron OCR v2 API Configuration
+NVIDIA_OCR_URL = os.getenv("NVIDIA_OCR_URL", "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2").strip()
+OCR_PROVIDER = os.getenv("OCR_PROVIDER", "nemotron").strip().lower()
