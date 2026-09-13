@@ -3,6 +3,7 @@ import { Sidebar } from './components/sidebar/Sidebar';
 import { TopNavigation } from './components/layout/TopNavigation';
 import { HeroInspectionArea } from './components/inspection/HeroInspectionArea';
 import { OCRResultView } from './components/ocr/OCRResultView';
+import { FeedbackSection } from './components/feedback/FeedbackSection';
 import { LoginModal } from './components/auth/LoginModal';
 import { CameraModal } from './components/camera/CameraModal';
 import { SettingsModal } from './components/layout/SettingsModal';
@@ -126,41 +127,48 @@ export function App() {
         />
 
         {/* Scrollable Main Content Workspace */}
-        <main className="flex-1 overflow-y-auto p-2.5 sm:p-4 md:p-6 lg:p-8 touch-pan-y">
-          {activeRecord ? (
-            <div className="max-w-7xl mx-auto w-full">
-              <OCRResultView
-                record={activeRecord}
-                selectedImageIndex={activeImageIndex}
-                onSelectImageIndex={setActiveImageIndex}
-                selectedOcrId={selectedOcrId}
-                hoveredOcrId={hoveredOcrId}
-                onSelectOcrId={setSelectedOcrId}
-                onHoverOcrId={setHoveredOcrId}
-                showOcrBoxes={showOcrBoxes}
-                onToggleShowOcrBoxes={() => setShowOcrBoxes(prev => !prev)}
-                onBackToNew={resetToNew}
-              />
-            </div>
-          ) : (
-            <div className="py-1 sm:py-3 max-w-4xl mx-auto w-full">
-              <HeroInspectionArea
-                instructionPrompt={instructionPrompt}
-                onInstructionChange={setInstructionPrompt}
-                selectedImages={selectedImages}
-                onFilesSelected={addImages}
-                onOpenCamera={() => setIsCameraModalOpen(true)}
-                onRemoveImage={removeImage}
-                onSelectImageIndex={setActiveImageIndex}
-                selectedImageIndex={activeImageIndex}
-                onStartInspection={startInspection}
-                pipelineStage={pipelineStage}
-                pipelineProgress={pipelineProgress}
-                pipelineMessage={pipelineMessage}
-                error={inspectionError}
-              />
-            </div>
-          )}
+        <main className="flex-1 overflow-y-auto p-2.5 sm:p-4 md:p-6 lg:p-8 touch-pan-y flex flex-col justify-between">
+          <div className="w-full">
+            {activeRecord ? (
+              <div className="max-w-7xl mx-auto w-full">
+                <OCRResultView
+                  record={activeRecord}
+                  selectedImageIndex={activeImageIndex}
+                  onSelectImageIndex={setActiveImageIndex}
+                  selectedOcrId={selectedOcrId}
+                  hoveredOcrId={hoveredOcrId}
+                  onSelectOcrId={setSelectedOcrId}
+                  onHoverOcrId={setHoveredOcrId}
+                  showOcrBoxes={showOcrBoxes}
+                  onToggleShowOcrBoxes={() => setShowOcrBoxes(prev => !prev)}
+                  onBackToNew={resetToNew}
+                />
+              </div>
+            ) : (
+              <div className="py-1 sm:py-3 max-w-4xl mx-auto w-full">
+                <HeroInspectionArea
+                  instructionPrompt={instructionPrompt}
+                  onInstructionChange={setInstructionPrompt}
+                  selectedImages={selectedImages}
+                  onFilesSelected={addImages}
+                  onOpenCamera={() => setIsCameraModalOpen(true)}
+                  onRemoveImage={removeImage}
+                  onSelectImageIndex={setActiveImageIndex}
+                  selectedImageIndex={activeImageIndex}
+                  onStartInspection={startInspection}
+                  pipelineStage={pipelineStage}
+                  pipelineProgress={pipelineProgress}
+                  pipelineMessage={pipelineMessage}
+                  error={inspectionError}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Footer-level Feedback Section */}
+          <footer className="mt-8 pt-6 border-t border-slate-200/60 max-w-4xl mx-auto w-full">
+            <FeedbackSection />
+          </footer>
         </main>
       </div>
 

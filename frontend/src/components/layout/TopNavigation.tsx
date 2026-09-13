@@ -1,22 +1,18 @@
 import React from 'react';
 import { Menu, Scale, RefreshCw } from 'lucide-react';
-import { UserProfileMenu } from '../auth/UserProfileMenu';
 import type { User } from '../../types/auth';
 
 export interface TopNavigationProps {
   onToggleSidebar: () => void;
-  user: User | null;
-  onLoginClick: () => void;
-  onLogout: () => void;
+  user?: User | null;
+  onLoginClick?: () => void;
+  onLogout?: () => void;
   activeInspectionId: string | null;
   onReloadHistory: () => void;
 }
 
 export const TopNavigation: React.FC<TopNavigationProps> = ({
   onToggleSidebar,
-  user,
-  onLoginClick,
-  onLogout,
   activeInspectionId,
   onReloadHistory,
 }) => {
@@ -59,7 +55,7 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
         </div>
       </div>
 
-      {/* Right: Actions & User Auth */}
+      {/* Right: Actions */}
       <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         <button
           type="button"
@@ -70,14 +66,6 @@ export const TopNavigation: React.FC<TopNavigationProps> = ({
         >
           <RefreshCw className="w-4 h-4" />
         </button>
-
-        <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
-        <UserProfileMenu
-          user={user}
-          onLoginClick={onLoginClick}
-          onLogout={onLogout}
-        />
       </div>
     </header>
   );
